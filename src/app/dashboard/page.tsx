@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dumbbell, Activity, Calendar, Plus, RefreshCw, ChevronRight, BarChart3, Database } from 'lucide-react'
+import { Plus, RefreshCw, ChevronRight, BarChart3, Activity } from 'lucide-react'
 import { WorkoutRoutine } from '@/lib/ai-fallback'
 import DataExport from '@/components/DataExport'
+import Sidebar from '@/components/Sidebar'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -166,24 +167,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-50 flex font-sans selection:bg-cyan-500/30">
       
       {/* Sidebar Navigation */}
-      <div className="hidden md:flex flex-col w-20 border-r border-neutral-800 bg-neutral-900/20 py-8 items-center gap-8">
-        <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-          <Dumbbell className="w-6 h-6 text-white" />
-        </div>
-        <div className="flex flex-col gap-6">
-          <button className="p-3 rounded-xl bg-neutral-800/50 text-cyan-400 group relative">
-            <Activity className="w-6 h-6" />
-          </button>
-          <button className="p-3 rounded-xl text-neutral-500 cursor-not-allowed group relative">
-            <Calendar className="w-6 h-6" />
-            <span className="absolute left-14 bg-neutral-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Coming soon</span>
-          </button>
-          <button className="p-3 rounded-xl text-neutral-500 cursor-not-allowed group relative">
-            <Database className="w-6 h-6" />
-            <span className="absolute left-14 bg-neutral-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Coming soon</span>
-          </button>
-        </div>
-      </div>
+      <Sidebar />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
