@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 export default function DashboardPage() {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
   const [generatedRoutine, setGeneratedRoutine] = useState<WorkoutRoutine | null>(null)
   
   const [profile, setProfile] = useState<any>(null)
@@ -103,9 +104,13 @@ export default function DashboardPage() {
   }
 
   const handleStartSession = async () => {
-    if (!generatedRoutine) return
+    if (!generatedRoutine || isStarting) return
+    setIsStarting(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setIsStarting(false)
+      return
+    }
 
     try {
       // 1. Create Workout
@@ -156,6 +161,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Error creating session", error)
       alert("Failed to start session. Check console.")
+      setIsStarting(false)
     }
   }
 
@@ -321,9 +327,14 @@ export default function DashboardPage() {
 
                   <button 
                     onClick={handleStartSession}
-                    className="w-full mt-6 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-xl px-4 py-3 text-sm transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(6,182,212,0.2)]"
+                    disabled={isStarting}
+                    className="w-full mt-6 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-xl px-4 py-3 text-sm transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(6,182,212,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Start Session <ChevronRight className="w-4 h-4" />
+                    {isStarting ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>Start Session <ChevronRight className="w-4 h-4" /></>
+                    )}
                   </button>
                 </div>
               )}
