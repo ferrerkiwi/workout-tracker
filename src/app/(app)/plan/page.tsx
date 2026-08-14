@@ -1,0 +1,78 @@
+import { redirect } from 'next/navigation'
+import { PlanEditor } from '@/components/plan-editor'
+import { PlanFooterActions } from '@/components/plan-footer-actions'
+import { PlanStart } from '@/components/plan-start'
+import type { PreferenceFact } from '@/components/preferences-summary'
+import { experienceLabel, goalLabels } from '@/lib/constants'
+import { getPreferences, getProfile, getRoutineForWeek } from '@/lib/queries'
+import { createClient } from '@/lib/supabase/server'
+import { startOfWeek, toDateKey, today } from '@/lib/week'
+
+export default async function PlanPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const weekStart = startOfWeek(today())
+  const weekStartKey = toDateKey(weekStart)
+
+  const [profile, preferences, routine] = await Promise.all([
+    getProfile(supabase, user.id),
+    getPreferences(supabase, user.id),
+    getRoutineForWeek(supabase, user.id, weekStartKey),
+  ])
+
+  const unit = profile?.unit_preference ?? 'lbs'
+
+  const facts: PreferenceFact[] = preferences
+    ? [
+        ['Goals', goalLabels(preferences.goals)],
+        ['Experience', experienceLabel(preferences.experience_level)],
+        [
+          'Days per week',
+          preferences.days_per_week === null
+            ? 'Up to the AI'
+            : String(preferences.days_per_week),
+        ],
+        [
+          'Session length',
+          preferences.session_length_min === null
+            ? 'Up to the AI'
+            : `${preferences.session_length_min} min`,
+        ],
+        ['Equipment', preferences.equipment.join(', ') || '—'],
+        ['Focus', preferences.focus_muscles.join(', ') || 'Balanced'],
+        ['Limitations', preferences.limitations || 'None'],
+      ]
+    : []
+
+  return (
+    <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Weekly plan</h1>
+        <p className="mt-1.5 text-muted">
+          Week of{' '}
+          {weekStart.toLocaleDateString(undefined, {
+            month: 'long',
+            day: 'numeric',
+          })}
+          {routine && ' · changes save as soon as you leave a field'}
+        </p>
+      </header>
+
+      {!routine ? (
+        <PlanStart facts={facts} hasPreferences={Boolean(preferences)} />
+      ) : (
+        <>
+          <PlanEditor routine={routine} unit={unit} />
+          <PlanFooterActions
+            canGenerate={Boolean(preferences)}
+            facts={facts}
+          />
+        </>
+      )}
+    </main>
+  )
+}
