@@ -1,7 +1,8 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { authSource, safeInternalPath } from '@/lib/auth-redirect'
 import { createClient } from '@/lib/supabase/server'
 import { REMEMBER_COOKIE, REMEMBER_MAX_AGE } from '@/lib/supabase/remember'
 
@@ -18,6 +19,23 @@ async function setRememberChoice(remember: boolean) {
     sameSite: 'lax',
     maxAge: REMEMBER_MAX_AGE,
   })
+}
+
+async function getRequestOrigin() {
+  const headerStore = await headers()
+  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host')
+  const proto =
+    headerStore.get('x-forwarded-proto') ??
+    (host?.startsWith('localhost') || host?.startsWith('127.0.0.1')
+      ? 'http'
+      : 'https')
+
+  if (host) return `${proto}://${host}`
+
+  const origin = headerStore.get('origin')
+  if (origin) return origin
+
+  return process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 }
 
 export async function login(
@@ -71,6 +89,38 @@ export async function signup(
   }
 
   redirect('/onboarding')
+}
+
+export async function continueWithGoogle(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const source = authSource(formData.get('source'))
+  const next = safeInternalPath(formData.get('next'))
+  const origin = await getRequestOrigin()
+  const callbackUrl = new URL('/auth/callback', origin)
+
+  callbackUrl.searchParams.set('source', source)
+  callbackUrl.searchParams.set('next', next)
+
+  // OAuth should follow the app's default persistent-login behavior.
+  await setRememberChoice(true)
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: callbackUrl.toString(),
+    },
+  })
+
+  if (error || !data.url) {
+    return {
+      error: 'Google sign-in could not be started. Please try again.',
+    }
+  }
+
+  redirect(data.url)
 }
 
 export async function logout() {

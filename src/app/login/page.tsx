@@ -1,9 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState } from 'react'
+import { Suspense, useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { AuthShell } from '@/components/auth-shell'
+import {
+  GoogleAuthFallback,
+  GoogleAuthForm,
+} from '@/components/google-auth-form'
 import { login, type AuthState } from '@/lib/auth-actions'
 
 function SubmitButton() {
@@ -31,7 +35,11 @@ export default function LoginPage() {
         </>
       }
     >
-      <form action={formAction} className="space-y-4">
+      <Suspense fallback={<GoogleAuthFallback />}>
+        <GoogleAuthForm source="login" />
+      </Suspense>
+
+      <form action={formAction} className="mt-5 space-y-4">
         <div>
           <label className="label" htmlFor="email">
             Email
