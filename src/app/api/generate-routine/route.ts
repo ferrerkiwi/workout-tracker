@@ -12,6 +12,14 @@ import {
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -21,14 +29,6 @@ export async function POST() {
       },
       { status: 500 },
     )
-  }
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
   }
 
   const [preferences, profile] = await Promise.all([

@@ -3,6 +3,7 @@ import { PlanEditor } from '@/components/plan-editor'
 import { PlanFooterActions } from '@/components/plan-footer-actions'
 import { PlanStart } from '@/components/plan-start'
 import type { PreferenceFact } from '@/components/preferences-summary'
+import { RoutineCoach } from '@/components/routine-coach'
 import { experienceLabel, goalLabels } from '@/lib/constants'
 import { getPreferences, getProfile, getRoutineForWeek } from '@/lib/queries'
 import { createClient } from '@/lib/supabase/server'
@@ -49,7 +50,7 @@ export default async function PlanPage() {
     : []
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-8 sm:py-12">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Weekly plan</h1>
         <p className="mt-1.5 text-muted">
@@ -63,15 +64,20 @@ export default async function PlanPage() {
       </header>
 
       {!routine ? (
-        <PlanStart facts={facts} hasPreferences={Boolean(preferences)} />
+        <div className="max-w-3xl">
+          <PlanStart facts={facts} hasPreferences={Boolean(preferences)} />
+        </div>
       ) : (
-        <>
-          <PlanEditor routine={routine} unit={unit} />
-          <PlanFooterActions
-            canGenerate={Boolean(preferences)}
-            facts={facts}
-          />
-        </>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="min-w-0">
+            <PlanEditor routine={routine} unit={unit} />
+            <PlanFooterActions
+              canGenerate={Boolean(preferences)}
+              facts={facts}
+            />
+          </div>
+          <RoutineCoach />
+        </div>
       )}
     </main>
   )
