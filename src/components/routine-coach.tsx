@@ -36,9 +36,13 @@ export function RoutineCoach() {
     })
   }, [messages, busy, error, drawerOpen])
 
-  async function sendMessage(message: string) {
+  async function sendMessage(
+    message: string,
+    options: { appendUserMessage?: boolean } = {},
+  ) {
     const content = message.trim()
     if (!content || busy) return
+    const appendUserMessage = options.appendUserMessage ?? true
 
     setError(null)
     setBusy(true)
@@ -46,7 +50,7 @@ export function RoutineCoach() {
     setLastUserMessage(content)
 
     const outgoing: ChatMessage = { role: 'user', content }
-    const nextMessages = [...messages, outgoing]
+    const nextMessages = appendUserMessage ? [...messages, outgoing] : messages
     setMessages(nextMessages)
 
     try {
@@ -96,7 +100,10 @@ export function RoutineCoach() {
       setDraft={setDraft}
       onSubmit={onSubmit}
       onSuggestion={(suggestion) => void sendMessage(suggestion)}
-      onRetry={() => lastUserMessage && void sendMessage(lastUserMessage)}
+      onRetry={() =>
+        lastUserMessage &&
+        void sendMessage(lastUserMessage, { appendUserMessage: false })
+      }
     />
   )
 

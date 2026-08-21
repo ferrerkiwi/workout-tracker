@@ -139,7 +139,7 @@ function tool(
   description: string,
   schema: z.ZodType,
 ): Anthropic.Tool {
-  const jsonSchema = z.toJSONSchema(schema)
+  const jsonSchema = toAnthropicToolSchema(z.toJSONSchema(schema))
   delete jsonSchema.$schema
 
   return {
@@ -148,6 +148,36 @@ function tool(
     strict: true,
     input_schema: jsonSchema as Anthropic.Tool.InputSchema,
   }
+}
+
+function toAnthropicToolSchema<T>(schema: T): T {
+  if (Array.isArray(schema)) {
+    return schema.map(toAnthropicToolSchema) as T
+  }
+
+  if (!schema || typeof schema !== 'object') return schema
+
+  const unsupportedStrictSchemaKeys = new Set([
+    'exclusiveMaximum',
+    'exclusiveMinimum',
+    'format',
+    'maxItems',
+    'maxLength',
+    'maxProperties',
+    'maximum',
+    'minItems',
+    'minLength',
+    'minProperties',
+    'minimum',
+    'pattern',
+    'uniqueItems',
+  ])
+
+  const entries = Object.entries(schema)
+    .filter(([key]) => !unsupportedStrictSchemaKeys.has(key))
+    .map(([key, value]) => [key, toAnthropicToolSchema(value)])
+
+  return Object.fromEntries(entries) as T
 }
 
 async function runTool(
