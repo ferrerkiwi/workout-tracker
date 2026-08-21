@@ -22,9 +22,7 @@ const updateExerciseSchema = z
     target_reps: z.number().int().min(1).max(100).optional(),
     target_seconds: z.number().int().min(1).max(3600).optional(),
     target_weight: z.number().min(0).max(2000).optional(),
-    clear_target_weight: z.boolean().optional(),
     notes: z.string().max(500).optional(),
-    clear_notes: z.boolean().optional(),
   })
   .strict()
 
@@ -37,9 +35,7 @@ const replaceExerciseSchema = z
     target_reps: z.number().int().min(1).max(100).optional(),
     target_seconds: z.number().int().min(1).max(3600).optional(),
     target_weight: z.number().min(0).max(2000).optional(),
-    clear_target_weight: z.boolean().optional(),
     notes: z.string().max(500).optional(),
-    clear_notes: z.boolean().optional(),
   })
   .strict()
 
@@ -91,7 +87,7 @@ export type RoutineAgentToolName =
 export const routineAgentTools: Anthropic.Tool[] = [
   tool(
     'update_exercise',
-    'Update fields on an existing exercise. Include only fields that should change. Use clear_target_weight or clear_notes when the user asks to clear those values.',
+    'Update fields on an existing exercise. Include only fields that should change.',
     updateExerciseSchema,
   ),
   tool(
@@ -256,9 +252,7 @@ function nullablePatch(input: {
   target_reps?: number
   target_seconds?: number
   target_weight?: number
-  clear_target_weight?: boolean
   notes?: string
-  clear_notes?: boolean
 }) {
   return {
     ...(input.exercise_name !== undefined ? { exercise_name: input.exercise_name } : {}),
@@ -272,11 +266,9 @@ function nullablePatch(input: {
     ...(input.target_seconds !== undefined
       ? { target_seconds: input.target_seconds }
       : {}),
-    ...(input.clear_target_weight ? { target_weight: null } : {}),
     ...(input.target_weight !== undefined
       ? { target_weight: input.target_weight }
       : {}),
-    ...(input.clear_notes ? { notes: null } : {}),
     ...(input.notes !== undefined ? { notes: input.notes } : {}),
   }
 }
