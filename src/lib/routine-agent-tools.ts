@@ -16,13 +16,15 @@ const metricSchema = z.enum(['reps', 'time'])
 const updateExerciseSchema = z
   .object({
     exercise_id: z.string().uuid(),
-    exercise_name: z.string().min(1).max(120).nullable(),
-    metric: metricSchema.nullable(),
-    target_sets: z.number().int().min(1).max(20).nullable(),
-    target_reps: z.number().int().min(1).max(100).nullable(),
-    target_seconds: z.number().int().min(1).max(3600).nullable(),
-    target_weight: z.number().min(0).max(2000).nullable(),
-    notes: z.string().max(500).nullable(),
+    exercise_name: z.string().min(1).max(120).optional(),
+    metric: metricSchema.optional(),
+    target_sets: z.number().int().min(1).max(20).optional(),
+    target_reps: z.number().int().min(1).max(100).optional(),
+    target_seconds: z.number().int().min(1).max(3600).optional(),
+    target_weight: z.number().min(0).max(2000).optional(),
+    clear_target_weight: z.boolean().optional(),
+    notes: z.string().max(500).optional(),
+    clear_notes: z.boolean().optional(),
   })
   .strict()
 
@@ -30,12 +32,14 @@ const replaceExerciseSchema = z
   .object({
     exercise_id: z.string().uuid(),
     exercise_name: z.string().min(1).max(120),
-    metric: metricSchema.nullable(),
-    target_sets: z.number().int().min(1).max(20).nullable(),
-    target_reps: z.number().int().min(1).max(100).nullable(),
-    target_seconds: z.number().int().min(1).max(3600).nullable(),
-    target_weight: z.number().min(0).max(2000).nullable(),
-    notes: z.string().max(500).nullable(),
+    metric: metricSchema.optional(),
+    target_sets: z.number().int().min(1).max(20).optional(),
+    target_reps: z.number().int().min(1).max(100).optional(),
+    target_seconds: z.number().int().min(1).max(3600).optional(),
+    target_weight: z.number().min(0).max(2000).optional(),
+    clear_target_weight: z.boolean().optional(),
+    notes: z.string().max(500).optional(),
+    clear_notes: z.boolean().optional(),
   })
   .strict()
 
@@ -45,11 +49,11 @@ const addExerciseSchema = z
     exercise_name: z.string().min(1).max(120),
     metric: metricSchema,
     target_sets: z.number().int().min(1).max(20),
-    target_reps: z.number().int().min(1).max(100).nullable(),
-    target_seconds: z.number().int().min(1).max(3600).nullable(),
-    target_weight: z.number().min(0).max(2000).nullable(),
-    notes: z.string().max(500).nullable(),
-    position: z.number().int().min(1).max(50).nullable(),
+    target_reps: z.number().int().min(1).max(100).optional(),
+    target_seconds: z.number().int().min(1).max(3600).optional(),
+    target_weight: z.number().min(0).max(2000).optional(),
+    notes: z.string().max(500).optional(),
+    position: z.number().int().min(1).max(50).optional(),
   })
   .strict()
 
@@ -62,17 +66,17 @@ const removeExerciseSchema = z
 const moveExerciseSchema = z
   .object({
     exercise_id: z.string().uuid(),
-    direction: z.enum(['up', 'down']).nullable(),
-    position: z.number().int().min(1).max(50).nullable(),
+    direction: z.enum(['up', 'down']).optional(),
+    position: z.number().int().min(1).max(50).optional(),
   })
   .strict()
 
 const updateDaySchema = z
   .object({
     routine_day_id: z.string().uuid(),
-    name: z.string().min(1).max(80).nullable(),
-    is_rest_day: z.boolean().nullable(),
-    clear_exercises: z.boolean(),
+    name: z.string().min(1).max(80).optional(),
+    is_rest_day: z.boolean().optional(),
+    clear_exercises: z.boolean().optional(),
   })
   .strict()
 
@@ -87,12 +91,12 @@ export type RoutineAgentToolName =
 export const routineAgentTools: Anthropic.Tool[] = [
   tool(
     'update_exercise',
-    'Update fields on an existing exercise. Use only when the user asks to change sets, reps, seconds, weight, notes, metric, or the exercise name.',
+    'Update fields on an existing exercise. Include only fields that should change. Use clear_target_weight or clear_notes when the user asks to clear those values.',
     updateExerciseSchema,
   ),
   tool(
     'replace_exercise',
-    'Replace one existing exercise with another while preserving its position unless other fields are changed.',
+    'Replace one existing exercise with another while preserving its position unless other fields are changed. Include only extra fields that should change.',
     replaceExerciseSchema,
   ),
   tool(
@@ -211,8 +215,8 @@ async function runTool(
         exercise_name: inputData.exercise_name,
         metric: inputData.metric as Metric,
         target_sets: inputData.target_sets,
-        target_reps: inputData.target_reps ?? undefined,
-        target_seconds: inputData.target_seconds ?? undefined,
+        target_reps: inputData.target_reps,
+        target_seconds: inputData.target_seconds,
         target_weight: inputData.target_weight,
         notes: inputData.notes,
         position: inputData.position,
@@ -227,7 +231,7 @@ async function runTool(
       const parsed = moveExerciseSchema.safeParse(input)
       if (!parsed.success) return { error: 'Tool input was malformed.' }
       return moveRoutineExercise(supabase, parsed.data.exercise_id, {
-        direction: parsed.data.direction ?? undefined,
+        direction: parsed.data.direction,
         position: parsed.data.position,
       })
     }
@@ -235,9 +239,9 @@ async function runTool(
       const parsed = updateDaySchema.safeParse(input)
       if (!parsed.success) return { error: 'Tool input was malformed.' }
       return updateRoutineDay(supabase, parsed.data.routine_day_id, {
-        name: parsed.data.name ?? undefined,
-        is_rest_day: parsed.data.is_rest_day ?? undefined,
-        clear_exercises: parsed.data.clear_exercises,
+        name: parsed.data.name,
+        is_rest_day: parsed.data.is_rest_day,
+        clear_exercises: parsed.data.clear_exercises ?? false,
       })
     }
     default:
@@ -246,31 +250,33 @@ async function runTool(
 }
 
 function nullablePatch(input: {
-  exercise_name?: string | null
+  exercise_name?: string
   metric?: Metric | null
-  target_sets?: number | null
-  target_reps?: number | null
-  target_seconds?: number | null
-  target_weight?: number | null
-  notes?: string | null
+  target_sets?: number
+  target_reps?: number
+  target_seconds?: number
+  target_weight?: number
+  clear_target_weight?: boolean
+  notes?: string
+  clear_notes?: boolean
 }) {
   return {
-    ...(input.exercise_name !== undefined && input.exercise_name !== null
-      ? { exercise_name: input.exercise_name }
-      : {}),
+    ...(input.exercise_name !== undefined ? { exercise_name: input.exercise_name } : {}),
     ...(input.metric ? { metric: input.metric } : {}),
-    ...(input.target_sets !== undefined && input.target_sets !== null
+    ...(input.target_sets !== undefined
       ? { target_sets: input.target_sets }
       : {}),
-    ...(input.target_reps !== undefined && input.target_reps !== null
+    ...(input.target_reps !== undefined
       ? { target_reps: input.target_reps }
       : {}),
     ...(input.target_seconds !== undefined
       ? { target_seconds: input.target_seconds }
       : {}),
+    ...(input.clear_target_weight ? { target_weight: null } : {}),
     ...(input.target_weight !== undefined
       ? { target_weight: input.target_weight }
       : {}),
+    ...(input.clear_notes ? { notes: null } : {}),
     ...(input.notes !== undefined ? { notes: input.notes } : {}),
   }
 }
