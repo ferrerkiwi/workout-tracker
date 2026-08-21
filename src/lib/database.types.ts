@@ -296,7 +296,21 @@ export type Database = {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      reset_weekly_plan_to_empty: {
+        Args: { p_week_start_date: string }
+        Returns: string
+      }
+      save_weekly_routine: {
+        Args: {
+          p_days: Json
+          p_generated_by_model: string
+          p_generation_prompt_version: string
+          p_week_start_date: string
+        }
+        Returns: string
+      }
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }

@@ -131,7 +131,8 @@ export async function logSet(
   if (!user) redirect('/login')
 
   // RLS restricts session_sets to the owner's sessions, so a forged
-  // sessionId cannot write here.
+  // sessionId cannot write here. order_index is part of the identity so two
+  // same-name exercises in one workout do not overwrite each other.
   const { error } = await supabase.from('session_sets').upsert(
     {
       session_id: sessionId,
@@ -143,7 +144,7 @@ export async function logSet(
       weight: set.weight,
       completed: set.completed,
     },
-    { onConflict: 'session_id,exercise_name,set_index' },
+    { onConflict: 'session_id,exercise_name,order_index,set_index' },
   )
 
   return error ? { error: error.message } : {}

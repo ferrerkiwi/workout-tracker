@@ -21,6 +21,7 @@ import { formatDateLabel } from '@/lib/week'
 
 type SetRow = {
   key: string
+  routine_exercise_id: string
   exercise_name: string
   order_index: number
   set_index: number
@@ -71,6 +72,7 @@ function buildRows(
     const last = lastPerformed[normaliseExerciseName(exercise.exercise_name)]
     return Array.from({ length: exercise.target_sets }, (_, i) => ({
       key: `${exercise.id}-${i}`,
+      routine_exercise_id: exercise.id,
       exercise_name: exercise.exercise_name,
       order_index: exercise.order_index,
       set_index: i,
@@ -82,14 +84,20 @@ function buildRows(
   })
 }
 
+function loggedSetKey(set: Pick<LoggedSet, 'exercise_name' | 'order_index' | 'set_index'>) {
+  return `${set.exercise_name}#${set.order_index}#${set.set_index}`
+}
+
+function rowStorageKey(row: Pick<SetRow, 'exercise_name' | 'order_index' | 'set_index'>) {
+  return `${row.exercise_name}#${row.order_index}#${row.set_index}`
+}
+
 /** Overlays already-saved sets onto the target-derived rows. */
 function hydrate(rows: SetRow[], saved: LoggedSet[]): SetRow[] {
   if (saved.length === 0) return rows
-  const byKey = new Map(
-    saved.map((s) => [`${s.exercise_name}#${s.set_index}`, s] as const),
-  )
+  const byKey = new Map(saved.map((s) => [loggedSetKey(s), s] as const))
   return rows.map((row) => {
-    const match = byKey.get(`${row.exercise_name}#${row.set_index}`)
+    const match = byKey.get(rowStorageKey(row))
     if (!match) return row
     const saved = row.isTime ? match.seconds : match.reps
     return {
@@ -175,7 +183,7 @@ export function SessionLogger({
           hydrate(
             prev,
             saved.filter(
-              (s) => !queued.has(`${s.exercise_name}#${s.set_index}`),
+              (s) => !queued.has(loggedSetKey(s)),
             ),
           ),
         )
@@ -190,7 +198,7 @@ export function SessionLogger({
   function persist(row: SetRow) {
     const id = sessionIdRef.current
     if (!id) {
-      pending.current.set(`${row.exercise_name}#${row.set_index}`, row)
+      pending.current.set(rowStorageKey(row), row)
       return
     }
     write(id, row)
@@ -249,7 +257,7 @@ export function SessionLogger({
       lastPerformed[normaliseExerciseName(exercise.exercise_name)],
       unit,
     ),
-    rows: rows.filter((r) => r.exercise_name === exercise.exercise_name),
+    rows: rows.filter((r) => r.routine_exercise_id === exercise.id),
   }))
 
   return (
