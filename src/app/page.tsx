@@ -1,7 +1,5 @@
-import { redirect } from 'next/navigation'
+import { MarketingHome } from '@/components/marketing-home'
 
-// proxy.ts already routes "/" based on auth state; this is the fallback for
-// any request that reaches the route directly.
 export default function Home() {
-  redirect('/dashboard')
+  return <MarketingHome />
 }

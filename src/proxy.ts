@@ -11,7 +11,7 @@ import {
 // filename and exported function name.
 
 /** Reachable without a session. */
-const PUBLIC_PATHS = ['/login', '/signup', '/auth']
+const PUBLIC_PATHS = ['/', '/login', '/signup', '/auth']
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some(
@@ -67,7 +67,7 @@ export async function proxy(request: NextRequest) {
   if (isApiRoute) return response
 
   if (!user) {
-    if (pathname === '/' || !isPublic(pathname)) return redirectTo('/login')
+    if (!isPublic(pathname)) return redirectTo('/login')
     return response
   }
 

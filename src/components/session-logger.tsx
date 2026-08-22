@@ -1,8 +1,9 @@
 'use client'
 
-import { Check, History, Loader2, Trash2 } from 'lucide-react'
+import { Check, History, Loader2, Timer, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { GuidedSet } from '@/components/guided-set'
 import {
   discardSession,
   finishSession,
@@ -135,6 +136,7 @@ export function SessionLogger({
   )
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [guidedRowKey, setGuidedRowKey] = useState<string | null>(null)
   const [finishing, startFinishing] = useTransition()
   const started = useRef(false)
   // Opening the session is a round trip, but the set toggles are live before it
@@ -143,9 +145,12 @@ export function SessionLogger({
   const sessionIdRef = useRef<string | null>(null)
   const pending = useRef(new Map<string, SetRow>())
 
-  function write(id: string, row: SetRow) {
+  async function write(
+    id: string,
+    row: SetRow,
+  ): Promise<{ error?: string }> {
     const amount = toNumber(row.amount)
-    void logSet(id, {
+    const result = await logSet(id, {
       exercise_name: row.exercise_name,
       order_index: row.order_index,
       set_index: row.set_index,
@@ -155,9 +160,9 @@ export function SessionLogger({
       seconds: row.isTime ? amount : null,
       weight: toNumber(row.weight),
       completed: row.completed,
-    }).then((res) => {
-      if (res.error) setError(res.error)
     })
+    if (result.error) setError(result.error)
+    return result
   }
 
   // Open (or resume) the session once, so every later save has an id and a
@@ -191,17 +196,17 @@ export function SessionLogger({
 
       const queued = [...pending.current.values()]
       pending.current.clear()
-      for (const row of queued) write(result.sessionId, row)
+      for (const row of queued) void write(result.sessionId, row)
     })
   }, [routineDayId])
 
-  function persist(row: SetRow) {
+  function persist(row: SetRow): Promise<{ error?: string }> {
     const id = sessionIdRef.current
     if (!id) {
       pending.current.set(rowStorageKey(row), row)
-      return
+      return Promise.resolve({ error: 'The workout session is still starting.' })
     }
-    write(id, row)
+    return write(id, row)
   }
 
   // The write stays outside the state updater: React can invoke updaters twice
@@ -211,7 +216,26 @@ export function SessionLogger({
     if (!current) return
     const updated = { ...current, ...patch }
     setRows((prev) => prev.map((row) => (row.key === key ? updated : row)))
-    if (save) persist(updated)
+    if (save) void persist(updated)
+  }
+
+  const guidedRow = rows.find((row) => row.key === guidedRowKey) ?? null
+  const guidedExercise = guidedRow
+    ? exercises.find((exercise) => exercise.id === guidedRow.routine_exercise_id) ?? null
+    : null
+
+  async function saveGuidedSet(completedReps: number) {
+    if (!guidedRow) throw new Error('That set is no longer available.')
+    const updated = {
+      ...guidedRow,
+      amount: String(completedReps),
+      completed: true,
+    }
+    setRows((previous) =>
+      previous.map((row) => (row.key === updated.key ? updated : row)),
+    )
+    const result = await persist(updated)
+    if (result.error) throw new Error(result.error)
   }
 
   const completedCount = rows.filter((r) => r.completed).length
@@ -287,17 +311,18 @@ export function SessionLogger({
           )}
 
           <div className="mt-4 space-y-2">
-            <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 px-1 text-xs font-medium text-muted uppercase">
+            <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem_2.5rem] gap-2 px-1 text-xs font-medium text-muted uppercase">
               <span>Set</span>
               <span>{isTime ? 'Seconds' : 'Reps'}</span>
               <span>Weight ({unit})</span>
+              <span className="sr-only">Guided set</span>
               <span className="text-right">Done</span>
             </div>
 
             {exerciseRows.map((row) => (
               <div
                 key={row.key}
-                className={`grid grid-cols-[2rem_1fr_1fr_2.5rem] items-center gap-2 rounded-xl px-1 py-1 transition ${
+                className={`grid grid-cols-[2rem_1fr_1fr_2.5rem_2.5rem] items-center gap-2 rounded-xl px-1 py-1 transition ${
                   row.completed ? 'bg-accent/5' : ''
                 }`}
               >
@@ -336,6 +361,25 @@ export function SessionLogger({
                   }}
                   className="input no-spin px-2.5 py-2 text-center"
                 />
+                {isTime ? (
+                  <span />
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={`Start guided set for ${exercise.exercise_name} set ${
+                      row.set_index + 1
+                    }`}
+                    title="Guided set"
+                    disabled={!sessionId}
+                    onClick={() => {
+                      setError(null)
+                      setGuidedRowKey(row.key)
+                    }}
+                    className="flex size-9 items-center justify-center justify-self-end rounded-lg border border-edge bg-surface-2 text-accent transition hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Timer className="size-4" />
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label={`Mark set ${row.set_index + 1} complete`}
@@ -394,6 +438,18 @@ export function SessionLogger({
           </div>
         </div>
       </div>
+
+      {guidedRow && guidedExercise && (
+        <GuidedSet
+          exerciseName={guidedRow.exercise_name}
+          setNumber={guidedRow.set_index + 1}
+          targetReps={guidedExercise.target_reps}
+          weight={guidedRow.weight}
+          unit={unit}
+          onSave={saveGuidedSet}
+          onClose={() => setGuidedRowKey(null)}
+        />
+      )}
     </div>
   )
 }
