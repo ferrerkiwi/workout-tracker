@@ -30,6 +30,7 @@ export function Sidebar() {
     >
       <span className="mb-4 hidden size-10 items-center justify-center rounded-xl bg-linear-to-br from-accent to-accent-strong sm:flex">
         <Dumbbell className="size-5 text-slate-950" />
+        <span className="sr-only">RepCadence</span>
       </span>
 
       {NAV.map(({ href, label, icon: Icon }) => {

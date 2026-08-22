@@ -2,7 +2,7 @@ export type AuthSource = 'login' | 'signup'
 
 export const GOOGLE_AUTH_ERROR_PARAM = 'google_error'
 
-const APP_ORIGIN = 'https://workout-tracker.local'
+const APP_ORIGIN = 'https://repcadence.local'
 
 const GOOGLE_AUTH_ERROR_MESSAGES: Record<string, string> = {
   code_exchange_failed:

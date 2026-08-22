@@ -75,7 +75,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       <span className="flex size-9 items-center justify-center rounded-lg bg-linear-to-br from-accent to-accent-strong text-slate-950 shadow-lg shadow-accent-strong/20">
         <Dumbbell className="size-4" aria-hidden="true" />
       </span>
-      <span className={compact ? 'hidden sm:inline' : undefined}>Workout Tracker</span>
+      <span className={compact ? 'hidden sm:inline' : undefined}>RepCadence</span>
     </span>
   )
 }
@@ -87,7 +87,7 @@ function MarketingHeader() {
         className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6"
         aria-label="Main navigation"
       >
-        <Link href="/" aria-label="Workout Tracker home">
+        <Link href="/" aria-label="RepCadence home">
           <Brand compact />
         </Link>
         <div className="hidden items-center gap-7 text-sm text-muted md:flex">
@@ -467,7 +467,7 @@ function MarketingFooter() {
       <div className="mx-auto flex max-w-6xl flex-col justify-between gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:px-6">
         <Brand />
         <p className="text-muted">Plan your week. Log the work. Keep moving.</p>
-        <p className="text-muted">© {new Date().getFullYear()} Workout Tracker</p>
+        <p className="text-muted">© {new Date().getFullYear()} RepCadence</p>
       </div>
     </footer>
   )

@@ -7,20 +7,20 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 
 export const metadata: Metadata = {
   title: {
-    default: 'Workout Tracker | Plan smarter. Train with intent.',
-    template: '%s | Workout Tracker',
+    default: 'RepCadence | Plan smarter. Train with intent.',
+    template: '%s | RepCadence',
   },
   description:
     'Build a personalized weekly routine, log every set, and keep your training moving forward.',
   openGraph: {
-    title: 'Workout Tracker | Plan smarter. Train with intent.',
+    title: 'RepCadence | Plan smarter. Train with intent.',
     description:
       'Build a personalized weekly routine, log every set, and keep your training moving forward.',
     type: 'website',
   },
   twitter: {
     card: 'summary',
-    title: 'Workout Tracker | Plan smarter. Train with intent.',
+    title: 'RepCadence | Plan smarter. Train with intent.',
     description:
       'Build a personalized weekly routine, log every set, and keep your training moving forward.',
   },

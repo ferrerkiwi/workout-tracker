@@ -19,6 +19,7 @@ export function AuthShell({
           <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-accent to-accent-strong">
             <Dumbbell className="size-6 text-slate-950" />
           </div>
+          <p className="mb-2 text-sm font-semibold text-accent">RepCadence</p>
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           <p className="mt-1.5 text-sm text-muted">{subtitle}</p>
         </div>
