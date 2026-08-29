@@ -297,6 +297,10 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      reset_training_data: {
+        Args: never
+        Returns: undefined
+      }
       reset_weekly_plan_to_empty: {
         Args: { p_week_start_date: string }
         Returns: string

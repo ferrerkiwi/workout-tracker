@@ -10,6 +10,7 @@ import {
   toDateKey,
   today,
 } from '@/lib/week'
+import { validateLoggedSet } from '@/lib/session-validation'
 
 export type LoggedSet = {
   exercise_name: string
@@ -103,10 +104,26 @@ export async function startSession(
       .select('id')
       .single()
 
-    if (error || !created) {
+    if (created) {
+      sessionId = created.id
+    } else if (error?.code === '23505') {
+      // A second tab can pass the initial lookup before the first tab inserts.
+      // The partial unique index turns that race into a safe resume.
+      const { data: racedSession } = await supabase
+        .from('workout_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('routine_day_id', routineDayId)
+        .eq('performed_on', performedOn)
+        .is('completed_at', null)
+        .maybeSingle()
+      if (!racedSession) {
+        return { error: 'Could not start the workout. Please try again.' }
+      }
+      sessionId = racedSession.id
+    } else {
       return { error: error?.message ?? 'Could not start the workout.' }
     }
-    sessionId = created.id
   }
 
   const { data: sets } = await supabase
@@ -129,6 +146,9 @@ export async function logSet(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const validationError = validateLoggedSet(set)
+  if (validationError) return { error: validationError }
 
   // RLS restricts session_sets to the owner's sessions, so a forged
   // sessionId cannot write here. order_index is part of the identity so two

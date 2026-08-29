@@ -2,7 +2,7 @@
 
 import { Check, History, Loader2, Timer, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { GuidedSet } from '@/components/guided-set'
 import {
   discardSession,
@@ -18,6 +18,7 @@ import {
   type LastPerformedMap,
   type RoutineExercise,
 } from '@/lib/queries'
+import { SerialWriteQueue } from '@/lib/serial-write-queue'
 import { formatDateLabel } from '@/lib/week'
 
 type SetRow = {
@@ -144,11 +145,13 @@ export function SessionLogger({
   // flush as soon as there is an id to write them against.
   const sessionIdRef = useRef<string | null>(null)
   const pending = useRef(new Map<string, SetRow>())
+  const writeQueue = useRef(new SerialWriteQueue())
+  const failedWrites = useRef(new Map<string, string>())
 
-  async function write(
+  const write = useCallback(async (
     id: string,
     row: SetRow,
-  ): Promise<{ error?: string }> {
+  ): Promise<{ error?: string }> => {
     const amount = toNumber(row.amount)
     const result = await logSet(id, {
       exercise_name: row.exercise_name,
@@ -161,9 +164,19 @@ export function SessionLogger({
       weight: toNumber(row.weight),
       completed: row.completed,
     })
-    if (result.error) setError(result.error)
+    const key = rowStorageKey(row)
+    if (result.error) {
+      failedWrites.current.set(key, result.error)
+      setError(result.error)
+    } else {
+      failedWrites.current.delete(key)
+    }
     return result
-  }
+  }, [])
+
+  const queueWrite = useCallback((id: string, row: SetRow) => {
+    return writeQueue.current.enqueue(() => write(id, row))
+  }, [write])
 
   // Open (or resume) the session once, so every later save has an id and a
   // mid-workout reload restores what was already logged.
@@ -196,9 +209,9 @@ export function SessionLogger({
 
       const queued = [...pending.current.values()]
       pending.current.clear()
-      for (const row of queued) void write(result.sessionId, row)
+      for (const row of queued) void queueWrite(result.sessionId, row)
     })
-  }, [routineDayId])
+  }, [queueWrite, routineDayId])
 
   function persist(row: SetRow): Promise<{ error?: string }> {
     const id = sessionIdRef.current
@@ -206,7 +219,7 @@ export function SessionLogger({
       pending.current.set(rowStorageKey(row), row)
       return Promise.resolve({ error: 'The workout session is still starting.' })
     }
-    return write(id, row)
+    return queueWrite(id, row)
   }
 
   // The write stays outside the state updater: React can invoke updaters twice
@@ -251,6 +264,11 @@ export function SessionLogger({
   function finish() {
     if (!sessionId) return
     startFinishing(async () => {
+      await writeQueue.current.flush()
+      if (failedWrites.current.size > 0) {
+        setError('Resolve the set save error before finishing this workout.')
+        return
+      }
       const res = await finishSession(sessionId)
       if (res.error) {
         setError(res.error)
