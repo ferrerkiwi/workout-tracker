@@ -9,8 +9,7 @@ import {
   Timer,
   Trash2,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DAY_NAMES } from '@/lib/constants'
 import {
   addExercise,
@@ -21,6 +20,16 @@ import {
 } from '@/lib/plan-actions'
 import type { Routine, RoutineDay, RoutineExercise } from '@/lib/queries'
 
+type PlanActionResult = { error?: string; data?: RoutineExercise }
+type PlanMutation = (
+  action: () => Promise<PlanActionResult>,
+  optimistic: (current: Routine) => Routine,
+  onSuccess?: (
+    result: PlanActionResult,
+    update: (updater: (current: Routine) => Routine) => void,
+  ) => void,
+) => Promise<void>
+
 export function PlanEditor({
   routine,
   unit,
@@ -29,6 +38,8 @@ export function PlanEditor({
   unit: string
 }) {
   const [error, setError] = useState<string | null>(null)
+  const [plan, setPlan] = useState(routine)
+  const writesInFlight = useRef(0)
   // Open the first training day, or — on a freshly cleared week where every
   // day is a rest day — the first day, so there is always something to edit.
   const [open, setOpen] = useState<string | null>(
@@ -36,6 +47,36 @@ export function PlanEditor({
       routine.routine_days[0]?.id ??
       null,
   )
+
+  // A coach edit or a later navigation can provide a new server snapshot. Do
+  // not let an in-flight action response overwrite the local optimistic view.
+  useEffect(() => {
+    if (writesInFlight.current === 0) setPlan(routine)
+  }, [routine])
+
+  const run: PlanMutation = (action, optimistic, onSuccess) => {
+    const rollback = plan
+    writesInFlight.current += 1
+    setError(null)
+    setPlan(optimistic)
+
+    return action()
+      .then((result) => {
+        if (result.error) {
+          setPlan(rollback)
+          setError(result.error)
+          return
+        }
+        onSuccess?.(result, setPlan)
+      })
+      .catch(() => {
+        setPlan(rollback)
+        setError('Could not save that change. Please try again.')
+      })
+      .finally(() => {
+        writesInFlight.current -= 1
+      })
+  }
 
   return (
     <div className="space-y-3">
@@ -45,14 +86,14 @@ export function PlanEditor({
         </p>
       )}
 
-      {routine.routine_days.map((day) => (
+      {plan.routine_days.map((day) => (
         <DayCard
           key={day.id}
           day={day}
           unit={unit}
           expanded={open === day.id}
-          onToggle={() => setOpen(open === day.id ? null : day.id)}
-          onError={setError}
+          onToggle={() => setOpen((current) => (current === day.id ? null : day.id))}
+          run={run}
         />
       ))}
     </div>
@@ -64,25 +105,19 @@ function DayCard({
   unit,
   expanded,
   onToggle,
-  onError,
+  run,
 }: {
   day: RoutineDay
   unit: string
   expanded: boolean
   onToggle: () => void
-  onError: (message: string | null) => void
+  run: PlanMutation
 }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
   const [adding, setAdding] = useState(false)
-
-  function run(fn: () => Promise<{ error?: string }>) {
-    start(async () => {
-      const res = await fn()
-      onError(res.error ?? null)
-      if (!res.error) router.refresh()
-    })
-  }
+  const [reordering, setReordering] = useState(false)
+  const hasPendingExercise = day.routine_exercises.some((exercise) =>
+    exercise.id.startsWith('pending-'),
+  )
 
   return (
     <section className="card p-0">
@@ -109,9 +144,14 @@ function DayCard({
           <input
             type="checkbox"
             checked={day.is_rest_day}
-            disabled={pending}
             onChange={(e) =>
-              run(() => setDayDetails(day.id, { is_rest_day: e.target.checked }))
+              run(
+                () => setDayDetails(day.id, { is_rest_day: e.target.checked }),
+                (plan) => updateDayInPlan(plan, day.id, (current) => ({
+                  ...current,
+                  is_rest_day: e.target.checked,
+                })),
+              )
             }
             className="size-4 rounded border-edge bg-surface-2 accent-accent"
           />
@@ -143,7 +183,13 @@ function DayCard({
             className="input mb-4"
             onBlur={(e) => {
               if (e.target.value.trim() === day.name) return
-              run(() => setDayDetails(day.id, { name: e.target.value }))
+              run(
+                () => setDayDetails(day.id, { name: e.target.value }),
+                (plan) => updateDayInPlan(plan, day.id, (current) => ({
+                  ...current,
+                  name: e.target.value.trim(),
+                })),
+              )
             }}
           />
 
@@ -160,8 +206,15 @@ function DayCard({
                   unit={unit}
                   isFirst={index === 0}
                   isLast={index === day.routine_exercises.length - 1}
-                  disabled={pending}
+                  reordering={reordering}
                   run={run}
+                  onMove={(direction) => {
+                    setReordering(true)
+                    void run(
+                      () => moveExercise(exercise.id, direction),
+                      (plan) => moveExerciseInPlan(plan, exercise.id, direction),
+                    ).finally(() => setReordering(false))
+                  }}
                 />
               ))}
             </ul>
@@ -177,9 +230,9 @@ function DayCard({
                 <button
                   onClick={() => {
                     setAdding(false)
-                    run(() => addExercise(day.id, 'reps'))
+                    addOptimistically('reps', day, run)
                   }}
-                  disabled={pending}
+                  disabled={hasPendingExercise}
                   className="btn-ghost h-auto flex-col items-start py-3 text-left"
                 >
                   <span className="flex items-center gap-2 font-semibold">
@@ -192,9 +245,9 @@ function DayCard({
                 <button
                   onClick={() => {
                     setAdding(false)
-                    run(() => addExercise(day.id, 'time'))
+                    addOptimistically('time', day, run)
                   }}
-                  disabled={pending}
+                  disabled={hasPendingExercise}
                   className="btn-ghost h-auto flex-col items-start py-3 text-left"
                 >
                   <span className="flex items-center gap-2 font-semibold">
@@ -215,7 +268,7 @@ function DayCard({
           ) : (
             <button
               onClick={() => setAdding(true)}
-              disabled={pending}
+              disabled={hasPendingExercise}
               className="btn-ghost w-full"
             >
               <Plus className="size-4" />
@@ -233,17 +286,20 @@ function ExerciseRow({
   unit,
   isFirst,
   isLast,
-  disabled,
+  reordering,
   run,
+  onMove,
 }: {
   exercise: RoutineExercise
   unit: string
   isFirst: boolean
   isLast: boolean
-  disabled: boolean
-  run: (fn: () => Promise<{ error?: string }>) => void
+  reordering: boolean
+  run: PlanMutation
+  onMove: (direction: 'up' | 'down') => void
 }) {
   const isTime = exercise.metric === 'time'
+  const isTemporary = exercise.id.startsWith('pending-')
 
   return (
     <li className="rounded-xl border border-edge bg-surface-2 p-3">
@@ -255,35 +311,45 @@ function ExerciseRow({
         <input
           key={`name-${exercise.exercise_name}`}
           defaultValue={exercise.exercise_name}
+          disabled={isTemporary}
           aria-label="Exercise name"
           className="input flex-1 px-2.5 py-1.5"
           onBlur={(e) => {
             if (e.target.value.trim() === exercise.exercise_name) return
-            run(() =>
-              updateExercise(exercise.id, { exercise_name: e.target.value }),
+            run(
+              () => updateExercise(exercise.id, { exercise_name: e.target.value }),
+              (plan) => updateExerciseInPlan(plan, exercise.id, (current) => ({
+                ...current,
+                exercise_name: e.target.value.trim(),
+              })),
             )
           }}
         />
         <div className="flex shrink-0 items-center">
           <button
-            onClick={() => run(() => moveExercise(exercise.id, 'up'))}
-            disabled={disabled || isFirst}
+            onClick={() => onMove('up')}
+            disabled={isTemporary || reordering || isFirst}
             aria-label="Move up"
             className="p-1.5 text-muted hover:text-foreground disabled:opacity-30"
           >
             <ChevronUp className="size-4" />
           </button>
           <button
-            onClick={() => run(() => moveExercise(exercise.id, 'down'))}
-            disabled={disabled || isLast}
+            onClick={() => onMove('down')}
+            disabled={isTemporary || reordering || isLast}
             aria-label="Move down"
             className="p-1.5 text-muted hover:text-foreground disabled:opacity-30"
           >
             <ChevronDown className="size-4" />
           </button>
           <button
-            onClick={() => run(() => deleteExercise(exercise.id))}
-            disabled={disabled}
+            onClick={() =>
+              run(
+                () => deleteExercise(exercise.id),
+                (plan) => removeExerciseFromPlan(plan, exercise.id),
+              )
+            }
+            disabled={isTemporary}
             aria-label="Remove exercise"
             className="p-1.5 text-muted hover:text-danger"
           >
@@ -298,11 +364,18 @@ function ExerciseRow({
             <button
               key={m}
               type="button"
-              disabled={disabled}
+              disabled={isTemporary}
               aria-pressed={isTime === (m === 'time')}
               onClick={() => {
                 if (isTime === (m === 'time')) return
-                run(() => updateExercise(exercise.id, { metric: m }))
+                run(
+                  () => updateExercise(exercise.id, { metric: m }),
+                  (plan) => updateExerciseInPlan(plan, exercise.id, (current) => ({
+                    ...current,
+                    metric: m,
+                    target_seconds: m === 'time' ? 45 : null,
+                  })),
+                )
               }}
               className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${
                 isTime === (m === 'time')
@@ -327,7 +400,13 @@ function ExerciseRow({
             defaultValue={exercise.target_sets}
             onCommit={(value) => {
               if (value === null) return
-              run(() => updateExercise(exercise.id, { target_sets: value }))
+              run(
+                () => updateExercise(exercise.id, { target_sets: value }),
+                (plan) => updateExerciseInPlan(plan, exercise.id, (current) => ({
+                  ...current,
+                  target_sets: clamp(value, 1, 20),
+                })),
+              )
             }}
           />
           {isTime ? (
@@ -339,7 +418,13 @@ function ExerciseRow({
               defaultValue={exercise.target_seconds}
               onCommit={(value) => {
                 if (value === null) return
-                run(() => updateExercise(exercise.id, { target_seconds: value }))
+                run(
+                  () => updateExercise(exercise.id, { target_seconds: value }),
+                  (plan) => updateExerciseInPlan(plan, exercise.id, (current) => ({
+                    ...current,
+                    target_seconds: clamp(value, 1, 3600),
+                  })),
+                )
               }}
             />
           ) : (
@@ -349,7 +434,13 @@ function ExerciseRow({
               defaultValue={exercise.target_reps}
               onCommit={(value) => {
                 if (value === null) return
-                run(() => updateExercise(exercise.id, { target_reps: value }))
+                run(
+                  () => updateExercise(exercise.id, { target_reps: value }),
+                  (plan) => updateExerciseInPlan(plan, exercise.id, (current) => ({
+                    ...current,
+                    target_reps: clamp(value, 1, 100),
+                  })),
+                )
               }}
             />
           )}
@@ -359,7 +450,13 @@ function ExerciseRow({
             defaultValue={exercise.target_weight}
             allowEmpty
             onCommit={(value) =>
-              run(() => updateExercise(exercise.id, { target_weight: value }))
+              run(
+                () => updateExercise(exercise.id, { target_weight: value }),
+                (plan) => updateExerciseInPlan(plan, exercise.id, (current) => ({
+                  ...current,
+                  target_weight: value === null ? null : Math.max(0, value),
+                })),
+              )
             }
           />
         </div>
@@ -404,4 +501,112 @@ function NumberField({
       />
     </label>
   )
+}
+
+let pendingExerciseSequence = 0
+
+function addOptimistically(
+  metric: 'reps' | 'time',
+  day: RoutineDay,
+  run: PlanMutation,
+) {
+  const temporary: RoutineExercise = {
+    id: `pending-${Date.now()}-${++pendingExerciseSequence}`,
+    order_index: day.routine_exercises.length,
+    exercise_name: metric === 'time' ? 'New hold' : 'New exercise',
+    metric,
+    target_sets: 3,
+    target_reps: 10,
+    target_seconds: metric === 'time' ? 45 : null,
+    target_weight: null,
+    rest_seconds: null,
+    notes: null,
+  }
+
+  run(
+    () => addExercise(day.id, metric),
+    (plan) =>
+      updateDayInPlan(plan, day.id, (current) => ({
+        ...current,
+        is_rest_day: false,
+        routine_exercises: [...current.routine_exercises, temporary],
+      })),
+    (result, update) => {
+      if (!result.data) return
+      // Keep the card in place while replacing its temporary local id with the
+      // row that Supabase assigned. Follow-up edits then use the real id.
+      update((plan) =>
+        updateExerciseInPlan(plan, temporary.id, () => result.data!),
+      )
+    },
+  )
+}
+
+function updateDayInPlan(
+  plan: Routine,
+  id: string,
+  update: (day: RoutineDay) => RoutineDay,
+): Routine {
+  return {
+    ...plan,
+    routine_days: plan.routine_days.map((day) => (day.id === id ? update(day) : day)),
+  }
+}
+
+function updateExerciseInPlan(
+  plan: Routine,
+  id: string,
+  update: (exercise: RoutineExercise) => RoutineExercise,
+): Routine {
+  return updateDayInPlan(plan, findExerciseDayId(plan, id), (day) => ({
+    ...day,
+    routine_exercises: day.routine_exercises.map((exercise) =>
+      exercise.id === id ? update(exercise) : exercise,
+    ),
+  }))
+}
+
+function removeExerciseFromPlan(plan: Routine, id: string): Routine {
+  return updateDayInPlan(plan, findExerciseDayId(plan, id), (day) => ({
+    ...day,
+    routine_exercises: reindex(
+      day.routine_exercises.filter((exercise) => exercise.id !== id),
+    ),
+  }))
+}
+
+function moveExerciseInPlan(
+  plan: Routine,
+  exerciseId: string,
+  direction: 'up' | 'down',
+): Routine {
+  const dayId = findExerciseDayId(plan, exerciseId)
+  return updateDayInPlan(plan, dayId, (day) => {
+    const from = day.routine_exercises.findIndex(
+      (exercise) => exercise.id === exerciseId,
+    )
+    const to = direction === 'up' ? from - 1 : from + 1
+    if (from < 0 || to < 0 || to >= day.routine_exercises.length) return day
+    const exercises = [...day.routine_exercises]
+    const [exercise] = exercises.splice(from, 1)
+    exercises.splice(to, 0, exercise)
+    return { ...day, routine_exercises: reindex(exercises) }
+  })
+}
+
+function findExerciseDayId(plan: Routine, exerciseId: string) {
+  return (
+    plan.routine_days.find((day) =>
+      day.routine_exercises.some((exercise) => exercise.id === exerciseId),
+    )?.id ?? ''
+  )
+}
+
+function reindex(exercises: RoutineExercise[]) {
+  return exercises.map((exercise, order_index) => ({ ...exercise, order_index }))
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  if (!Number.isFinite(value)) return minimum
+  return Math.min(maximum, Math.max(minimum, Math.round(value)))
 }

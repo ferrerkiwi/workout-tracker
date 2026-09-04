@@ -1,9 +1,9 @@
 'use client'
 
 import { Check, History, Loader2, Timer, Trash2 } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
-import { GuidedSet } from '@/components/guided-set'
 import {
   discardSession,
   finishSession,
@@ -20,6 +20,14 @@ import {
 } from '@/lib/queries'
 import { SerialWriteQueue } from '@/lib/serial-write-queue'
 import { formatDateLabel } from '@/lib/week'
+
+// Guided Set uses browser-only audio, speech, and wake-lock APIs. It is only
+// needed after a user chooses a set, so keeping it out of the initial session
+// chunk makes opening an ordinary workout lighter.
+const GuidedSet = dynamic(
+  () => import('@/components/guided-set').then((module) => module.GuidedSet),
+  { ssr: false },
+)
 
 type SetRow = {
   key: string

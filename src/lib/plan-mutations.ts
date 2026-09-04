@@ -1,8 +1,8 @@
 import { revalidatePath } from 'next/cache'
 import type { TablesUpdate } from '@/lib/database.types'
-import type { Client } from '@/lib/queries'
+import type { Client, RoutineExercise } from '@/lib/queries'
 
-export type ActionResult = { error?: string }
+export type ActionResult<T = undefined> = { error?: string; data?: T }
 export type Metric = 'reps' | 'time'
 
 export type ExercisePatch = {
@@ -30,7 +30,7 @@ export async function addRoutineExercise(
   supabase: Client,
   routineDayId: string,
   input: AddExerciseInput = {},
-): Promise<ActionResult> {
+): Promise<ActionResult<RoutineExercise>> {
   const day = await getRoutineDay(supabase, routineDayId)
   if (!day) return { error: 'Routine day not found.' }
 
@@ -59,7 +59,9 @@ export async function addRoutineExercise(
           : Math.max(0, input.target_weight),
       notes: input.notes?.trim() || null,
     })
-    .select('id, order_index')
+    .select(
+      'id, order_index, exercise_name, metric, target_sets, target_reps, target_seconds, target_weight, rest_seconds, notes',
+    )
     .single()
   if (error) return { error: error.message }
 
@@ -68,7 +70,7 @@ export async function addRoutineExercise(
     const [newExercise] = ordered.splice(exercises.length, 1)
     ordered.splice(position - 1, 0, newExercise)
     const reorderResult = await writeExerciseOrder(supabase, ordered)
-    if (reorderResult.error) return reorderResult
+    if (reorderResult.error) return { error: reorderResult.error }
   }
 
   if (day.is_rest_day) {
@@ -80,7 +82,7 @@ export async function addRoutineExercise(
   }
 
   revalidatePlan()
-  return {}
+  return { data: inserted as RoutineExercise }
 }
 
 export async function updateRoutineExercise(

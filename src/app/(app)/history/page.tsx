@@ -1,7 +1,7 @@
 import { History as HistoryIcon } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { getProfile } from '@/lib/queries'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import { formatDateLabel, formatVolume } from '@/lib/week'
 
 type SessionSet = {
@@ -23,10 +23,7 @@ function describeSet(set: SessionSet): string {
 }
 
 export default async function HistoryPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
   const [profile, { data: sessions }] = await Promise.all([

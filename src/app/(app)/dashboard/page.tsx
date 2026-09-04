@@ -16,7 +16,7 @@ import {
   getThisWeekSessions,
 } from '@/lib/queries'
 import { buildPlanLookup, computeStreak } from '@/lib/streak'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import {
   addDays,
   formatVolume,
@@ -29,10 +29,7 @@ import {
 } from '@/lib/week'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
   const now = today()

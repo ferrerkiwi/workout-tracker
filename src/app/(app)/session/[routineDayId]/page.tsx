@@ -5,7 +5,7 @@ import { SessionLogger } from '@/components/session-logger'
 import { DAY_NAMES } from '@/lib/constants'
 import type { RoutineExercise } from '@/lib/queries'
 import { getLastPerformed, getProfile } from '@/lib/queries'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import { dateForRoutineDay, isFuture, relativeDayLabel } from '@/lib/week'
 
 export default async function SessionPage({
@@ -13,10 +13,7 @@ export default async function SessionPage({
 }: PageProps<'/session/[routineDayId]'>) {
   const { routineDayId } = await params
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
   // RLS scopes routine_days to the owner, so a foreign id simply returns null.

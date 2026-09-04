@@ -9,6 +9,7 @@ import {
   updateRoutineExercise,
   type ActionResult,
 } from '@/lib/plan-mutations'
+import type { RoutineExercise } from '@/lib/queries'
 import { createClient } from '@/lib/supabase/server'
 
 async function requireUser() {
@@ -29,7 +30,7 @@ async function requireUser() {
 export async function addExercise(
   routineDayId: string,
   metric: 'reps' | 'time' = 'reps',
-): Promise<ActionResult> {
+): Promise<ActionResult<RoutineExercise>> {
   const supabase = await requireUser()
   return addRoutineExercise(supabase, routineDayId, { metric })
 }

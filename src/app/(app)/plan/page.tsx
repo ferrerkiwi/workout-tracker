@@ -6,14 +6,11 @@ import type { PreferenceFact } from '@/components/preferences-summary'
 import { RoutineCoach } from '@/components/routine-coach'
 import { experienceLabel, goalLabels } from '@/lib/constants'
 import { getPreferences, getProfile, getRoutineForWeek } from '@/lib/queries'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import { startOfWeek, toDateKey, today } from '@/lib/week'
 
 export default async function PlanPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
   const weekStart = startOfWeek(today())

@@ -10,13 +10,10 @@ import {
   SignOutPanel,
 } from '@/components/settings-panels'
 import { getPreferences, getProfile } from '@/lib/queries'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
   const [profile, preferences] = await Promise.all([
