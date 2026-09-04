@@ -1,16 +1,16 @@
 @import 'tailwindcss';
 
-/* Single committed dark theme — this is a gym app, not a document reader. */
+/* The app palette follows the RepCadence mark: near-black surfaces, white type, and training green. */
 :root {
-  --background: #06080d;
-  --foreground: #e8edf5;
-  --muted: #8b97ab;
-  --surface: #0d121b;
-  --surface-2: #131a26;
-  --border: #1f2836;
-  --accent: #22d3ee;
-  --accent-strong: #2563eb;
-  --danger: #f87171;
+  --background: #080a09;
+  --foreground: #f3f6f3;
+  --muted: #9aa69e;
+  --surface: #101411;
+  --surface-2: #171d19;
+  --border: #27332b;
+  --accent: #70e89a;
+  --accent-strong: #42bd70;
+  --danger: #fb807a;
 }
 
 @theme inline {
@@ -36,8 +36,8 @@ body {
 
 .marketing-grid {
   background-image:
-    linear-gradient(to right, rgb(31 40 54 / 0.5) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(31 40 54 / 0.5) 1px, transparent 1px);
+    linear-gradient(to right, rgb(39 51 43 / 0.55) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(39 51 43 / 0.55) 1px, transparent 1px);
   background-size: 3.5rem 3.5rem;
   mask-image: linear-gradient(to bottom, black, transparent 72%);
 }

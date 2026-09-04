@@ -2,13 +2,13 @@
 
 import {
   CalendarDays,
-  Dumbbell,
   History,
   LayoutDashboard,
   Settings,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { BrandMark } from '@/components/brand-mark'
 
 const NAV = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -28,8 +28,8 @@ export function Sidebar() {
                  sm:inset-y-0 sm:right-auto sm:left-0 sm:w-[72px] sm:flex-col
                  sm:justify-start sm:gap-1 sm:border-t-0 sm:border-r sm:py-4"
     >
-      <span className="mb-4 hidden size-10 items-center justify-center rounded-xl bg-linear-to-br from-accent to-accent-strong sm:flex">
-        <Dumbbell className="size-5 text-slate-950" />
+      <span className="mb-4 hidden size-10 items-center justify-center sm:flex">
+        <BrandMark size={40} className="rounded-xl shadow-lg shadow-black/35" />
         <span className="sr-only">RepCadence</span>
       </span>
 

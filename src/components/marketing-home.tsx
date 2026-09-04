@@ -4,7 +4,6 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
-  Dumbbell,
   ListChecks,
   Play,
   Sparkles,
@@ -12,6 +11,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import Link from 'next/link'
+import { BrandMark } from '@/components/brand-mark'
 
 const features = [
   {
@@ -72,9 +72,7 @@ export function MarketingHome() {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5 font-semibold">
-      <span className="flex size-9 items-center justify-center rounded-lg bg-linear-to-br from-accent to-accent-strong text-slate-950 shadow-lg shadow-accent-strong/20">
-        <Dumbbell className="size-4" aria-hidden="true" />
-      </span>
+      <BrandMark size={36} className="rounded-lg shadow-lg shadow-black/35" />
       <span className={compact ? 'hidden sm:inline' : undefined}>RepCadence</span>
     </span>
   )
@@ -441,7 +439,7 @@ function FinalCta() {
     <section className="py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="overflow-hidden rounded-2xl border border-accent/30 bg-surface px-6 py-12 text-center shadow-xl shadow-accent/5 sm:px-12 sm:py-16">
-          <Dumbbell className="mx-auto size-8 text-accent" aria-hidden="true" />
+          <BrandMark size={44} className="mx-auto rounded-xl shadow-lg shadow-black/35" />
           <h2 className="mx-auto mt-5 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
             Ready to build your next training week?
           </h2>

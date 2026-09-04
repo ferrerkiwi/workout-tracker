@@ -1,5 +1,5 @@
-import { Dumbbell } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { BrandMark } from '@/components/brand-mark'
 
 export function AuthShell({
   title,
@@ -16,9 +16,7 @@ export function AuthShell({
     <main className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-accent to-accent-strong">
-            <Dumbbell className="size-6 text-slate-950" />
-          </div>
+          <BrandMark size={48} className="mb-4 rounded-2xl shadow-lg shadow-black/35" />
           <p className="mb-2 text-sm font-semibold text-accent">RepCadence</p>
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           <p className="mt-1.5 text-sm text-muted">{subtitle}</p>
