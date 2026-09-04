@@ -24,7 +24,7 @@ export function Sidebar() {
     <nav
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around
-                 border-t border-edge bg-surface/95 px-2 py-2 backdrop-blur
+                 border-t border-edge bg-surface/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur
                  sm:inset-y-0 sm:right-auto sm:left-0 sm:w-[72px] sm:flex-col
                  sm:justify-start sm:gap-1 sm:border-t-0 sm:border-r sm:py-4"
     >

@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
     <div className="min-h-dvh">
       <Sidebar />
       {/* Bottom bar on mobile, left rail from sm up. */}
-      <div className="pb-20 sm:pb-0 sm:pl-[72px]">{children}</div>
+      <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0 sm:pl-[72px]">{children}</div>
     </div>
   )
 }

@@ -116,7 +116,7 @@ export function RoutineCoach() {
       <button
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="btn-primary fixed right-4 bottom-4 z-30 shadow-lg lg:hidden"
+        className="btn-primary fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 shadow-lg sm:bottom-4 lg:hidden"
       >
         <MessageCircle className="size-4" />
         Routine coach
