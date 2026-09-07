@@ -9,6 +9,16 @@ import {
 import { safeInternalPath } from '../src/lib/auth-redirect.ts'
 import { SerialWriteQueue } from '../src/lib/serial-write-queue.ts'
 import { validateLoggedSet } from '../src/lib/session-validation.ts'
+import { normaliseWeekStartParam } from '../src/lib/week.ts'
+
+test('week URL values accept real dates and normalize to their Monday', () => {
+  assert.equal(normaliseWeekStartParam('2026-09-07'), '2026-09-07')
+  assert.equal(normaliseWeekStartParam('2026-09-10'), '2026-09-07')
+  assert.equal(normaliseWeekStartParam('2027-01-01'), '2026-12-28')
+  assert.equal(normaliseWeekStartParam('2026-02-29'), null)
+  assert.equal(normaliseWeekStartParam('09-07-2026'), null)
+  assert.equal(normaliseWeekStartParam(['2026-09-07']), null)
+})
 
 test('Guided Set counts only completed 3-0-1-0 tempo cycles', () => {
   assert.equal(getCompletedReps(0), 0)

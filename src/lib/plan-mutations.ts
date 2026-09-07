@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import type { TablesUpdate } from '@/lib/database.types'
 import type { Client, RoutineExercise } from '@/lib/queries'
+import { startOfWeek, toDateKey, today } from '@/lib/week'
 
 export type ActionResult<T = undefined> = { error?: string; data?: T }
 export type Metric = 'reps' | 'time'
@@ -90,6 +91,12 @@ export async function updateRoutineExercise(
   exerciseId: string,
   patch: ExercisePatch,
 ): Promise<ActionResult> {
+  const exercise = await getRoutineExercise(supabase, exerciseId)
+  if (!exercise) return { error: 'Exercise not found or is read-only.' }
+  if (!(await getRoutineDay(supabase, exercise.routine_day_id))) {
+    return { error: 'Past weekly plans are read-only.' }
+  }
+
   const clean = cleanExercisePatch(patch)
   if ('error' in clean) return clean
   if (Object.keys(clean).length === 0) return {}
@@ -119,6 +126,12 @@ export async function deleteRoutineExercise(
   supabase: Client,
   exerciseId: string,
 ): Promise<ActionResult> {
+  const exercise = await getRoutineExercise(supabase, exerciseId)
+  if (!exercise) return { error: 'Exercise not found or is read-only.' }
+  if (!(await getRoutineDay(supabase, exercise.routine_day_id))) {
+    return { error: 'Past weekly plans are read-only.' }
+  }
+
   const { data, error } = await supabase
     .from('routine_exercises')
     .delete()
@@ -146,6 +159,9 @@ export async function moveRoutineExercise(
     .maybeSingle()
   if (error) return { error: error.message }
   if (!current) return { error: 'Exercise not found.' }
+  if (!(await getRoutineDay(supabase, current.routine_day_id))) {
+    return { error: 'Past weekly plans are read-only.' }
+  }
 
   const exercises = await getDayExercises(supabase, current.routine_day_id)
   const currentIndex = exercises.findIndex((exercise) => exercise.id === exerciseId)
@@ -248,10 +264,21 @@ function cleanExercisePatch(
 }
 
 async function getRoutineDay(supabase: Client, routineDayId: string) {
+  const currentWeekStart = toDateKey(startOfWeek(today()))
   const { data } = await supabase
     .from('routine_days')
-    .select('id, is_rest_day')
+    .select('id, is_rest_day, routines!inner(week_start_date)')
     .eq('id', routineDayId)
+    .eq('routines.week_start_date', currentWeekStart)
+    .maybeSingle()
+  return data
+}
+
+async function getRoutineExercise(supabase: Client, exerciseId: string) {
+  const { data } = await supabase
+    .from('routine_exercises')
+    .select('id, routine_day_id')
+    .eq('id', exerciseId)
     .maybeSingle()
   return data
 }

@@ -21,6 +21,24 @@ export function fromDateKey(key: string): Date {
   return new Date(y, m - 1, d)
 }
 
+/**
+ * Accepts one real calendar date from a `week` URL parameter and returns the
+ * Monday that starts its week. Invalid values are deliberately ignored rather
+ * than being passed through to a database query.
+ */
+export function normaliseWeekStartParam(
+  value: string | string[] | undefined,
+): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null
+  }
+
+  const date = fromDateKey(value)
+  if (Number.isNaN(date.getTime()) || toDateKey(date) !== value) return null
+
+  return toDateKey(startOfWeek(date))
+}
+
 /** 0 = Monday … 6 = Sunday, matching `routine_days.day_of_week`. */
 export function mondayIndex(date: Date): number {
   return (date.getDay() + 6) % 7
@@ -66,6 +84,15 @@ export function relativeDayLabel(date: Date): string {
     return date.toLocaleDateString(undefined, { weekday: 'long' })
   }
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/** A concise, locale-aware label for a Monday-start training week. */
+export function formatWeekRange(weekStart: string): string {
+  const start = fromDateKey(weekStart)
+  const end = addDays(start, 6)
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+
+  return `${start.toLocaleDateString(undefined, options)} - ${end.toLocaleDateString(undefined, options)}`
 }
 
 export function formatVolume(volume: number, unit: string): string {

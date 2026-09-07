@@ -33,9 +33,11 @@ type PlanMutation = (
 export function PlanEditor({
   routine,
   unit,
+  readOnly = false,
 }: {
   routine: Routine
   unit: string
+  readOnly?: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState(routine)
@@ -94,6 +96,7 @@ export function PlanEditor({
           expanded={open === day.id}
           onToggle={() => setOpen((current) => (current === day.id ? null : day.id))}
           run={run}
+          readOnly={readOnly}
         />
       ))}
     </div>
@@ -106,12 +109,14 @@ function DayCard({
   expanded,
   onToggle,
   run,
+  readOnly,
 }: {
   day: RoutineDay
   unit: string
   expanded: boolean
   onToggle: () => void
   run: PlanMutation
+  readOnly: boolean
 }) {
   const [adding, setAdding] = useState(false)
   const [reordering, setReordering] = useState(false)
@@ -140,23 +145,25 @@ function DayCard({
           </span>
         </button>
 
-        <label className="flex shrink-0 items-center gap-2 text-xs text-muted">
-          <input
-            type="checkbox"
-            checked={day.is_rest_day}
-            onChange={(e) =>
-              run(
-                () => setDayDetails(day.id, { is_rest_day: e.target.checked }),
-                (plan) => updateDayInPlan(plan, day.id, (current) => ({
-                  ...current,
-                  is_rest_day: e.target.checked,
-                })),
-              )
-            }
-            className="size-4 rounded border-edge bg-surface-2 accent-accent"
-          />
-          Rest
-        </label>
+        {!readOnly && (
+          <label className="flex shrink-0 items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={day.is_rest_day}
+              onChange={(e) =>
+                run(
+                  () => setDayDetails(day.id, { is_rest_day: e.target.checked }),
+                  (plan) => updateDayInPlan(plan, day.id, (current) => ({
+                    ...current,
+                    is_rest_day: e.target.checked,
+                  })),
+                )
+              }
+              className="size-4 rounded border-edge bg-surface-2 accent-accent"
+            />
+            Rest
+          </label>
+        )}
 
         <button
           onClick={onToggle}
@@ -173,25 +180,29 @@ function DayCard({
 
       {expanded && (
         <div className="border-t border-edge p-4">
-          <label className="label" htmlFor={`name-${day.id}`}>
-            Day name
-          </label>
-          <input
-            id={`name-${day.id}`}
-            key={`day-name-${day.name}`}
-            defaultValue={day.name}
-            className="input mb-4"
-            onBlur={(e) => {
-              if (e.target.value.trim() === day.name) return
-              run(
-                () => setDayDetails(day.id, { name: e.target.value }),
-                (plan) => updateDayInPlan(plan, day.id, (current) => ({
-                  ...current,
-                  name: e.target.value.trim(),
-                })),
-              )
-            }}
-          />
+          {!readOnly && (
+            <>
+              <label className="label" htmlFor={`name-${day.id}`}>
+                Day name
+              </label>
+              <input
+                id={`name-${day.id}`}
+                key={`day-name-${day.name}`}
+                defaultValue={day.name}
+                className="input mb-4"
+                onBlur={(e) => {
+                  if (e.target.value.trim() === day.name) return
+                  run(
+                    () => setDayDetails(day.id, { name: e.target.value }),
+                    (plan) => updateDayInPlan(plan, day.id, (current) => ({
+                      ...current,
+                      name: e.target.value.trim(),
+                    })),
+                  )
+                }}
+              />
+            </>
+          )}
 
           {day.routine_exercises.length === 0 ? (
             <p className="mb-4 text-sm text-muted">
@@ -208,6 +219,7 @@ function DayCard({
                   isLast={index === day.routine_exercises.length - 1}
                   reordering={reordering}
                   run={run}
+                  readOnly={readOnly}
                   onMove={(direction) => {
                     setReordering(true)
                     void run(
@@ -220,7 +232,7 @@ function DayCard({
             </ul>
           )}
 
-          {adding ? (
+          {!readOnly && adding ? (
             <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
               <p className="text-sm font-medium">How is this exercise measured?</p>
               <p className="mt-0.5 text-xs text-muted">
@@ -265,7 +277,7 @@ function DayCard({
                 Cancel
               </button>
             </div>
-          ) : (
+          ) : !readOnly ? (
             <button
               onClick={() => setAdding(true)}
               disabled={hasPendingExercise}
@@ -274,7 +286,7 @@ function DayCard({
               <Plus className="size-4" />
               Add exercise
             </button>
-          )}
+          ) : null}
         </div>
       )}
     </section>
@@ -289,6 +301,7 @@ function ExerciseRow({
   reordering,
   run,
   onMove,
+  readOnly,
 }: {
   exercise: RoutineExercise
   unit: string
@@ -297,9 +310,34 @@ function ExerciseRow({
   reordering: boolean
   run: PlanMutation
   onMove: (direction: 'up' | 'down') => void
+  readOnly: boolean
 }) {
   const isTime = exercise.metric === 'time'
   const isTemporary = exercise.id.startsWith('pending-')
+
+  if (readOnly) {
+    return (
+      <li className="rounded-xl border border-edge bg-surface-2 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate font-medium">{exercise.exercise_name}</p>
+          <span className="shrink-0 rounded-md bg-surface px-2 py-1 text-xs text-muted">
+            {isTime ? 'Time' : 'Reps'}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <ReadOnlyField label="Sets" value={exercise.target_sets} />
+          <ReadOnlyField
+            label={isTime ? 'Seconds' : 'Reps'}
+            value={isTime ? exercise.target_seconds : exercise.target_reps}
+          />
+          <ReadOnlyField label={unit} value={exercise.target_weight} />
+        </div>
+        {exercise.notes && (
+          <p className="mt-3 text-sm text-muted">{exercise.notes}</p>
+        )}
+      </li>
+    )
+  }
 
   return (
     <li className="rounded-xl border border-edge bg-surface-2 p-3">
@@ -462,6 +500,17 @@ function ExerciseRow({
         </div>
       </div>
     </li>
+  )
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div>
+      <p className="mb-1 text-xs text-muted">{label}</p>
+      <p className="rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-center text-sm">
+        {value ?? '—'}
+      </p>
+    </div>
   )
 }
 

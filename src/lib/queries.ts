@@ -94,6 +94,22 @@ export async function getRoutineForWeek(
   return sortRoutine(data as unknown as Routine)
 }
 
+/** Lightweight existence check used to offer copying the immediately prior week. */
+export async function hasRoutineForWeek(
+  supabase: Client,
+  userId: string,
+  weekStart: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('routines')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('week_start_date', weekStart)
+    .maybeSingle()
+
+  return Boolean(data)
+}
+
 /** The most recent routine, whichever week it belongs to. */
 export async function getLatestRoutine(
   supabase: Client,

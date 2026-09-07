@@ -297,6 +297,10 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      copy_last_weekly_plan: {
+        Args: { p_week_start_date: string }
+        Returns: string
+      }
       reset_training_data: {
         Args: never
         Returns: undefined
