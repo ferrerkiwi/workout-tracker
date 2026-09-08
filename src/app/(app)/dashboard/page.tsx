@@ -11,10 +11,10 @@ import { redirect } from 'next/navigation'
 import { DAY_NAMES } from '@/lib/constants'
 import {
   getProfile,
-  getRoutineForWeek,
   getStreakSource,
   getThisWeekSessions,
 } from '@/lib/queries'
+import { ensureCurrentRoutine } from '@/lib/routine-initialization'
 import { buildPlanLookup, computeStreak } from '@/lib/streak'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import {
@@ -34,11 +34,12 @@ export default async function DashboardPage() {
 
   const now = today()
   const weekStart = startOfWeek(now)
-  const weekStartKey = toDateKey(weekStart)
 
-  const [profile, routine, streakSource, weekSessions] = await Promise.all([
+  // Initialize before the streak query so this render sees the new week's
+  // rest/training days as well as the routine shown below.
+  const routine = await ensureCurrentRoutine(supabase, user.id)
+  const [profile, streakSource, weekSessions] = await Promise.all([
     getProfile(supabase, user.id),
-    getRoutineForWeek(supabase, user.id, weekStartKey),
     getStreakSource(supabase, user.id),
     getThisWeekSessions(supabase, user.id),
   ])

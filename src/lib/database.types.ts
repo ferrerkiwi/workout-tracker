@@ -301,6 +301,10 @@ export type Database = {
         Args: { p_week_start_date: string }
         Returns: string
       }
+      ensure_current_weekly_routine: {
+        Args: { p_week_start_date: string }
+        Returns: string
+      }
       reset_training_data: {
         Args: never
         Returns: undefined

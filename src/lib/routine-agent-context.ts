@@ -3,10 +3,10 @@ import {
   formatTarget,
   getPreferences,
   getProfile,
-  getRoutineForWeek,
   type Routine,
 } from '@/lib/queries'
 import type { Client } from '@/lib/queries'
+import { ensureCurrentRoutine } from '@/lib/routine-initialization'
 import { startOfWeek, toDateKey, today } from '@/lib/week'
 
 export type RoutineAgentContext = {
@@ -22,7 +22,7 @@ export async function loadRoutineAgentContext(
   const [profile, preferences, routine] = await Promise.all([
     getProfile(supabase, userId),
     getPreferences(supabase, userId),
-    getRoutineForWeek(supabase, userId, weekStart),
+    ensureCurrentRoutine(supabase, userId),
   ])
 
   const unit = profile?.unit_preference ?? 'lbs'

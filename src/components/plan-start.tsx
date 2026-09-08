@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, Copy, Loader2, PenLine, Sparkles } from 'lucide-react'
+import { ArrowLeft, Loader2, PenLine, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
@@ -8,40 +8,25 @@ import {
   PreferencesSummary,
   type PreferenceFact,
 } from '@/components/preferences-summary'
-import { copyLastWeekPlan, resetPlanToEmpty } from '@/lib/routine-actions'
+import { resetPlanToEmpty } from '@/lib/routine-actions'
 import { useGenerate } from '@/lib/use-generate'
 
 export function PlanStart({
   facts,
   hasPreferences,
-  hasPreviousRoutine = false,
 }: {
   facts: readonly PreferenceFact[]
   hasPreferences: boolean
-  hasPreviousRoutine?: boolean
 }) {
   const router = useRouter()
   const [choice, setChoice] = useState<'generate' | null>(null)
   const [building, startBuilding] = useTransition()
   const [buildError, setBuildError] = useState<string | null>(null)
-  const [copying, startCopying] = useTransition()
   const { generate, busy, error } = useGenerate()
 
   function buildOwn() {
     startBuilding(async () => {
       const res = await resetPlanToEmpty()
-      if (res.error) {
-        setBuildError(res.error)
-        return
-      }
-      router.refresh()
-    })
-  }
-
-  function copyLastWeek() {
-    startCopying(async () => {
-      setBuildError(null)
-      const res = await copyLastWeekPlan()
       if (res.error) {
         setBuildError(res.error)
         return
@@ -92,7 +77,7 @@ export function PlanStart({
         No plan for this week yet. How would you like to start?
       </p>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <button
           onClick={() => setChoice('generate')}
           disabled={!hasPreferences}
@@ -129,25 +114,6 @@ export function PlanStart({
           </span>
         </button>
 
-        {hasPreviousRoutine && (
-          <button
-            onClick={copyLastWeek}
-            disabled={copying}
-            className="card flex flex-col items-start gap-2 text-left transition hover:border-accent/50 disabled:opacity-50"
-          >
-            <span className="flex size-10 items-center justify-center rounded-xl bg-surface-2">
-              {copying ? (
-                <Loader2 className="size-5 animate-spin text-muted" />
-              ) : (
-                <Copy className="size-5 text-muted" />
-              )}
-            </span>
-            <span className="mt-1 font-semibold">Copy last week&apos;s plan</span>
-            <span className="text-sm text-muted">
-              Starts this week with a separate copy of last week&apos;s routine.
-            </span>
-          </button>
-        )}
       </div>
 
       {!hasPreferences && (

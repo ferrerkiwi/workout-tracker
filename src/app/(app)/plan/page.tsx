@@ -10,11 +10,10 @@ import {
   getPreferences,
   getProfile,
   getRoutineForWeek,
-  hasRoutineForWeek,
 } from '@/lib/queries'
+import { ensureCurrentRoutine } from '@/lib/routine-initialization'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import {
-  addDays,
   normaliseWeekStartParam,
   startOfWeek,
   toDateKey,
@@ -31,15 +30,13 @@ export default async function PlanPage({ searchParams }: PageProps<'/plan'>) {
   const weekStartKey = requestedWeek ?? currentWeekStartKey
   const isCurrentWeek = weekStartKey === currentWeekStartKey
   const isPastWeek = weekStartKey < currentWeekStartKey
-  const previousWeekKey = toDateKey(addDays(currentWeekStart, -7))
 
-  const [profile, preferences, routine, hasPreviousRoutine] = await Promise.all([
+  const [profile, preferences, routine] = await Promise.all([
     getProfile(supabase, user.id),
     getPreferences(supabase, user.id),
-    getRoutineForWeek(supabase, user.id, weekStartKey),
     isCurrentWeek
-      ? hasRoutineForWeek(supabase, user.id, previousWeekKey)
-      : Promise.resolve(false),
+      ? ensureCurrentRoutine(supabase, user.id)
+      : getRoutineForWeek(supabase, user.id, weekStartKey),
   ])
 
   const unit = profile?.unit_preference ?? 'lbs'
@@ -91,7 +88,6 @@ export default async function PlanPage({ searchParams }: PageProps<'/plan'>) {
             <PlanStart
               facts={facts}
               hasPreferences={Boolean(preferences)}
-              hasPreviousRoutine={hasPreviousRoutine}
             />
           ) : (
             <div className="card text-center">

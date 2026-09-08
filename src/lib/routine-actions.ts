@@ -78,22 +78,3 @@ export async function resetPlanToEmpty(): Promise<SaveRoutineResult> {
   revalidatePath('/dashboard')
   return { ok: true }
 }
-
-/** Copies last week's routine into a new, independent routine for this week. */
-export async function copyLastWeekPlan(): Promise<SaveRoutineResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const weekStart = toDateKey(startOfWeek(today()))
-  const { error } = await supabase.rpc('copy_last_weekly_plan', {
-    p_week_start_date: weekStart,
-  })
-  if (error) return { error: error.message }
-
-  revalidatePath('/plan')
-  revalidatePath('/dashboard')
-  return { ok: true }
-}
