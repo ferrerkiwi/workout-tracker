@@ -196,7 +196,7 @@ export function PreferencesForm({
                   inside needs an arbitrary variant rather than putting
                   peer-checked on the nested element itself. */}
               <span
-                className="flex items-center gap-2.5 rounded-xl border border-edge
+                className="flex items-center gap-2.5 rounded-lg border border-edge
                            bg-surface-2 px-4 py-3 text-sm transition
                            hover:border-accent/40
                            peer-checked:border-accent peer-checked:bg-accent/10
@@ -230,7 +230,7 @@ export function PreferencesForm({
                 className="peer sr-only"
               />
               <span
-                className="block h-full rounded-xl border border-edge bg-surface-2 px-4 py-3
+                className="block h-full rounded-lg border border-edge bg-surface-2 px-4 py-3
                            transition peer-checked:border-accent
                            peer-checked:bg-accent/10 hover:border-accent/40"
               >
@@ -334,7 +334,7 @@ export function PreferencesForm({
                 className="peer sr-only"
               />
               <span
-                className="inline-block rounded-xl border border-edge bg-surface-2 px-5 py-2.5
+                className="inline-block rounded-lg border border-edge bg-surface-2 px-5 py-2.5
                            text-sm transition peer-checked:border-accent
                            peer-checked:bg-accent/10 hover:border-accent/40"
               >
@@ -346,12 +346,12 @@ export function PreferencesForm({
       </Section>
 
       {state.error && (
-        <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {state.error}
         </p>
       )}
       {state.saved && (
-        <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+        <p className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
           Preferences saved.
         </p>
       )}

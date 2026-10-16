@@ -6,7 +6,7 @@ import { DAY_NAMES } from '@/lib/constants'
 import type { RoutineExercise } from '@/lib/queries'
 import { getLastPerformed, getProfile } from '@/lib/queries'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
-import { dateForRoutineDay, isFuture, relativeDayLabel } from '@/lib/week'
+import { isScheduledLaterThisWeek } from '@/lib/week'
 
 export default async function SessionPage({
   params,
@@ -21,22 +21,19 @@ export default async function SessionPage({
     .from('routine_days')
     .select(
       `id, name, day_of_week, is_rest_day,
-       routines ( week_start_date ),
+       routines!inner ( is_active ),
        routine_exercises (
          id, order_index, exercise_name, metric, target_sets, target_reps,
          target_seconds, target_weight, rest_seconds, notes
        )`,
     )
     .eq('id', routineDayId)
+    .eq('routines.is_active', true)
     .maybeSingle()
 
   if (!day) notFound()
 
-  const routine = day.routines as { week_start_date: string } | null
-  const scheduledFor = routine
-    ? dateForRoutineDay(routine.week_start_date, day.day_of_week)
-    : null
-  const notYet = scheduledFor ? isFuture(scheduledFor) : false
+  const notYet = isScheduledLaterThisWeek(day.day_of_week)
 
   const [profile, lastPerformed] = await Promise.all([
     getProfile(supabase, user.id),
@@ -58,7 +55,7 @@ export default async function SessionPage({
           <ArrowLeft className="size-4" />
           Overview
         </Link>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">{day.name}</h1>
+        <h1 className="mt-3 text-3xl font-bold">{day.name}</h1>
         <p className="mt-1 text-muted">
           {DAY_NAMES[day.day_of_week]} · {exercises.length} exercises
         </p>
@@ -66,11 +63,11 @@ export default async function SessionPage({
 
       {notYet ? (
         <div className="card flex flex-col items-center py-10 text-center">
-          <span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-surface-2">
+          <span className="mb-4 flex size-12 items-center justify-center rounded-lg bg-surface-2">
             <CalendarClock className="size-6 text-muted" />
           </span>
           <h2 className="text-lg font-semibold">
-            Not {relativeDayLabel(scheduledFor!)} yet
+            Not {DAY_NAMES[day.day_of_week]} yet
           </h2>
           <p className="mt-1 max-w-sm text-sm text-muted">
             This session is scheduled for{' '}
@@ -92,10 +89,10 @@ export default async function SessionPage({
           <p className="mt-1 text-sm text-muted">
             {day.is_rest_day
               ? 'This is a scheduled rest day.'
-              : 'This day has no exercises yet — add some in the weekly plan.'}
+              : 'This day has no exercises yet — add some in your routine.'}
           </p>
           <Link href="/plan" className="btn-ghost mt-4">
-            Edit weekly plan
+            Edit routine
           </Link>
         </div>
       ) : (

@@ -16,6 +16,7 @@ import {
   executeRoutineAgentTool,
   routineAgentTools,
 } from '@/lib/routine-agent-tools'
+import { isAnonymousUser } from '@/lib/demo'
 import { createClient } from '@/lib/supabase/server'
 
 const requestSchema = z
@@ -62,9 +63,26 @@ export async function POST(request: Request) {
   let context = await loadRoutineAgentContext(supabase, user.id)
   if (!context.routine) {
     return NextResponse.json(
-      { error: 'Create a weekly routine before asking the coach.' },
+      { error: 'Create a routine before asking the coach.' },
       { status: 400 },
     )
+  }
+
+  if (isAnonymousUser(user)) {
+    const { error } = await supabase.rpc('consume_demo_coach_request')
+    if (error) {
+      console.error('Demo coach quota error:', error.code)
+
+      return NextResponse.json(
+        {
+          error:
+            error.code === 'P0001'
+              ? 'Demo coach limit reached. Please try again tomorrow.'
+              : 'The demo coach is unavailable right now. Please try again shortly.',
+        },
+        { status: error.code === 'P0001' ? 429 : 500 },
+      )
+    }
   }
 
   const anthropic = new Anthropic({ apiKey })

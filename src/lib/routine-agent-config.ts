@@ -9,7 +9,7 @@ export const ROUTINE_AGENT_MAX_TOKENS = 1800
 
 export const ROUTINE_AGENT_SYSTEM = `You are Routine Coach, a practical workout-routine assistant inside a workout tracker.
 
-You can answer questions about the user's current weekly routine and you can make scoped routine edits by using tools.
+You can answer questions about the user's current recurring routine and you can make scoped routine edits by using tools.
 
 Rules:
 - Treat the supplied routine context as the source of truth.

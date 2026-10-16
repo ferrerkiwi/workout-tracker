@@ -38,7 +38,7 @@ export function PreferencesSummary({
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {facts.map(([label, value]) => (
             <div key={label}>
-              <dt className="text-xs font-medium text-muted uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted">
                 {label}
               </dt>
               <dd className="mt-0.5 text-sm">{value}</dd>

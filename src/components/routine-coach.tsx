@@ -116,7 +116,7 @@ export function RoutineCoach() {
       <button
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="btn-primary fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 shadow-lg sm:bottom-4 lg:hidden"
+        className="btn-ghost fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 border-accent/40 bg-surface shadow-lg shadow-black/25 sm:bottom-4 lg:hidden"
       >
         <MessageCircle className="size-4" />
         Routine coach
@@ -130,7 +130,7 @@ export function RoutineCoach() {
             className="absolute inset-0 bg-background/80"
             onClick={() => setDrawerOpen(false)}
           />
-          <section className="absolute inset-x-0 bottom-0 flex max-h-[90dvh] min-h-[70dvh] flex-col rounded-t-2xl border border-edge bg-surface p-4 shadow-2xl">
+          <section className="absolute inset-x-0 bottom-0 flex max-h-[90dvh] min-h-[70dvh] flex-col rounded-t-lg border border-edge bg-surface p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bot className="size-5 text-accent" />
@@ -140,7 +140,7 @@ export function RoutineCoach() {
                 type="button"
                 aria-label="Close"
                 onClick={() => setDrawerOpen(false)}
-                className="rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-foreground"
+                className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-foreground"
               >
                 <X className="size-4" />
               </button>
@@ -175,7 +175,7 @@ function CoachPanel({
   onRetry: () => void
 }) {
   return (
-    <section className="card flex h-[min(720px,calc(100dvh-4rem))] min-h-0 flex-col p-0">
+    <section className="flex h-[min(720px,calc(100dvh-4rem))] min-h-0 flex-col overflow-hidden rounded-lg border border-edge bg-surface">
       <div className="border-b border-edge p-4">
         <div className="flex items-center gap-2">
           <Bot className="size-5 text-accent" />
@@ -196,14 +196,14 @@ function CoachPanel({
               I can review the current plan, explain the split, or make focused
               changes like swaps, sets, reps, ordering, and rest days.
             </p>
-            <div className="grid gap-2">
+            <div className="grid divide-y divide-edge border-y border-edge">
               {SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => onSuggestion(suggestion)}
                   disabled={busy}
-                  className="btn-ghost h-auto justify-start px-3 py-2 text-left text-xs"
+                  className="h-auto py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:text-accent disabled:opacity-50"
                 >
                   {suggestion}
                 </button>
@@ -224,7 +224,7 @@ function CoachPanel({
         )}
 
         {error && (
-          <div className="rounded-lg border border-danger/30 bg-danger/10 p-3">
+          <div className="rounded-md border border-danger/30 bg-danger/10 p-3">
             <p className="text-sm text-danger">{error}</p>
             <button
               type="button"
@@ -264,7 +264,7 @@ function CoachPanel({
             type="submit"
             disabled={busy || draft.trim().length === 0}
             aria-label="Send message"
-            className="btn-primary px-3"
+            className="btn-primary size-11 shrink-0 px-0"
           >
             {busy ? (
               <Loader2 className="size-4 animate-spin" />
@@ -283,10 +283,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[88%] rounded-xl px-3 py-2 text-sm ${
+        className={`max-w-[88%] rounded-md px-3 py-2 text-sm ${
           isUser
-            ? 'bg-accent text-slate-950'
-            : 'border border-edge bg-surface-2 text-foreground'
+            ? 'bg-accent/15 text-foreground'
+            : 'border-l-2 border-edge pl-3 text-foreground'
         }`}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>

@@ -3,14 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import {
-  dateForRoutineDay,
-  isFuture,
-  relativeDayLabel,
-  toDateKey,
-  today,
-} from '@/lib/week'
+import { isScheduledLaterThisWeek, toDateKey, today } from '@/lib/week'
 import { validateLoggedSet } from '@/lib/session-validation'
+import type { MovementType, WorkoutExercise } from '@/lib/workout-flow'
 
 export type LoggedSet = {
   exercise_name: string
@@ -28,11 +23,12 @@ export type StartSessionResult = {
   error?: string
   sessionId?: string
   sets?: LoggedSet[]
+  exercises?: WorkoutExercise[]
 }
 
 /**
- * Returns today's in-progress session for a routine day, creating it if this
- * is the first set logged. Reusing an open session makes the page safe to
+ * Returns today's in-progress session for a routine day, creating it when the
+ * workout is opened. Reusing an open session makes the page safe to
  * reload mid-workout.
  */
 export async function startSession(
@@ -46,18 +42,18 @@ export async function startSession(
 
   const performedOn = toDateKey(today())
 
-  // A workout scheduled for a later date cannot be started yet. Checked here
-  // rather than only in the UI, so the guard holds however the action is
+  // A workout scheduled for a later weekday cannot be started yet. Checked
+  // here rather than only in the UI, so the guard holds however the action is
   // reached.
   const { data: scheduled } = await supabase
     .from('routine_days')
-    .select('name, day_of_week, is_rest_day, routines (week_start_date)')
+    .select('name, day_of_week, is_rest_day, routines!inner (is_active)')
     .eq('id', routineDayId)
+    .eq('routines.is_active', true)
     .maybeSingle<{
       name: string
       day_of_week: number
       is_rest_day: boolean
-      routines: { week_start_date: string } | null
     }>()
 
   if (!scheduled) return { error: 'That workout no longer exists.' }
@@ -65,16 +61,10 @@ export async function startSession(
     return { error: 'That day is a rest day — there is nothing to log.' }
   }
 
-  if (scheduled.routines) {
-    const when = dateForRoutineDay(
-      scheduled.routines.week_start_date,
-      scheduled.day_of_week,
-    )
-    if (isFuture(when)) {
-      return {
-        error: `That workout is scheduled for ${relativeDayLabel(when)}. ` +
-          'You can start it on the day.',
-      }
+  if (isScheduledLaterThisWeek(scheduled.day_of_week)) {
+    return {
+      error: 'That workout is scheduled for a later day this week. ' +
+        'You can start it on the day.',
     }
   }
 
@@ -126,111 +116,60 @@ export async function startSession(
     }
   }
 
-  const { data: sets } = await supabase
+  const { data: snapshot, error: snapshotError } = await supabase.rpc('prepare_workout_exercises', { p_session_id: sessionId })
+  if (snapshotError) return { error: snapshotError.message }
+
+  const { data: sets, error: setsError } = await supabase
     .from('session_sets')
     .select(
       'exercise_name, order_index, set_index, reps, seconds, weight, completed',
     )
     .eq('session_id', sessionId)
 
-  return { sessionId, sets: (sets ?? []) as LoggedSet[] }
+  if (setsError) return { error: setsError.message }
+  return { sessionId, sets: (sets ?? []) as LoggedSet[], exercises: snapshot as unknown as WorkoutExercise[] }
 }
 
-/** Writes a single set. Called as the user checks sets off. */
-export async function logSet(
-  sessionId: string,
+/** Saves the result and applies any earned progression in one database transaction. */
+export async function completeSet(
+  workoutExerciseId: string,
   set: LoggedSet,
-): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
+  movementType: MovementType | null,
+): Promise<{ error?: string; nextWeight?: number | null }> {
   const validationError = validateLoggedSet(set)
   if (validationError) return { error: validationError }
-
-  // RLS restricts session_sets to the owner's sessions, so a forged
-  // sessionId cannot write here. order_index is part of the identity so two
-  // same-name exercises in one workout do not overwrite each other.
-  const { error } = await supabase.from('session_sets').upsert(
-    {
-      session_id: sessionId,
-      exercise_name: set.exercise_name,
-      order_index: set.order_index,
-      set_index: set.set_index,
-      reps: set.reps,
-      seconds: set.seconds,
-      weight: set.weight,
-      completed: set.completed,
-    },
-    { onConflict: 'session_id,exercise_name,order_index,set_index' },
-  )
-
-  return error ? { error: error.message } : {}
+  if (!set.completed || (set.reps === null && set.seconds === null)) {
+    return { error: 'Enter your result before saving the set.' }
+  }
+  if (movementType !== null && movementType !== 'compound' && movementType !== 'isolation') {
+    return { error: 'Choose compound or isolation.' }
+  }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data, error } = await supabase.rpc('complete_workout_set', {
+    p_workout_exercise_id: workoutExerciseId,
+    p_set_index: set.set_index,
+    p_reps: set.reps,
+    p_seconds: set.seconds,
+    p_weight: set.weight,
+    p_movement_type: movementType,
+  })
+  if (error) return { error: error.message }
+  revalidatePath('/plan')
+  revalidatePath('/dashboard')
+  const result = data as { nextWeight: number | null }
+  return { nextWeight: result.nextWeight }
 }
 
-/**
- * Completes a session and stores its total volume.
- *
- * Volume is recomputed from the stored sets rather than trusting a number
- * from the client, and counts only sets actually checked off. Bodyweight sets
- * (null weight) contribute zero.
- */
-export async function finishSession(
-  sessionId: string,
-): Promise<{ error?: string }> {
+/** The database locks the session so finishing cannot race a set save. */
+export async function finishSession(sessionId: string): Promise<{ error?: string }> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-
-  const { data: sets, error: setsError } = await supabase
-    .from('session_sets')
-    .select('reps, weight, completed')
-    .eq('session_id', sessionId)
-  if (setsError) return { error: setsError.message }
-
-  const totalVolume = (sets ?? [])
-    .filter((s) => s.completed)
-    .reduce((sum, s) => sum + (s.reps ?? 0) * Number(s.weight ?? 0), 0)
-
-  const { error } = await supabase
-    .from('workout_sessions')
-    .update({
-      completed_at: new Date().toISOString(),
-      total_volume: Math.round(totalVolume * 100) / 100,
-    })
-    .eq('id', sessionId)
-    .eq('user_id', user.id)
-
+  const { error } = await supabase.rpc('finish_workout', { p_session_id: sessionId })
   if (error) return { error: error.message }
-
   revalidatePath('/dashboard')
   revalidatePath('/history')
-  return {}
-}
-
-/** Abandons an in-progress session and its logged sets. */
-export async function discardSession(
-  sessionId: string,
-): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { error } = await supabase
-    .from('workout_sessions')
-    .delete()
-    .eq('id', sessionId)
-    .eq('user_id', user.id)
-    .is('completed_at', null)
-
-  if (error) return { error: error.message }
-
-  revalidatePath('/dashboard')
   return {}
 }

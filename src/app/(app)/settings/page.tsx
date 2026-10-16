@@ -9,6 +9,7 @@ import {
   DisplayNamePanel,
   SignOutPanel,
 } from '@/components/settings-panels'
+import { isAnonymousUser } from '@/lib/demo'
 import { getPreferences, getProfile } from '@/lib/queries'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 
@@ -33,13 +34,20 @@ export default async function SettingsPage() {
         unit_preference: profile?.unit_preference ?? 'lbs',
       }
     : { ...EMPTY_PREFERENCES, unit_preference: profile?.unit_preference ?? 'lbs' }
+  const isDemo = isAnonymousUser(user)
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-8 sm:py-12">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-bold">Settings</h1>
         <p className="mt-1.5 text-muted">
-          Signed in as <span className="text-foreground">{user.email}</span>
+          {isDemo ? (
+            'Demo mode · changes are temporary.'
+          ) : (
+            <>
+              Signed in as <span className="text-foreground">{user.email}</span>
+            </>
+          )}
         </p>
       </header>
 
@@ -47,7 +55,7 @@ export default async function SettingsPage() {
         <DisplayNamePanel initial={profile?.display_name ?? ''} />
 
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-muted uppercase tracking-wide">
+          <h2 className="mb-3 text-sm font-semibold text-muted">
             Training preferences
           </h2>
           <p className="mb-4 text-sm text-muted">
@@ -62,7 +70,7 @@ export default async function SettingsPage() {
         </div>
 
         <SignOutPanel />
-        <DangerZonePanel />
+        {!isDemo && <DangerZonePanel />}
       </div>
     </main>
   )

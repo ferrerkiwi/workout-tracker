@@ -48,7 +48,7 @@ export default async function HistoryPage() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">History</h1>
+        <h1 className="text-3xl font-bold">History</h1>
         <p className="mt-1.5 text-muted">
           {rows.length === 0
             ? 'Completed workouts will show up here.'
@@ -58,7 +58,7 @@ export default async function HistoryPage() {
 
       {rows.length === 0 ? (
         <div className="card flex flex-col items-center py-10 text-center">
-          <span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-accent/15">
+          <span className="mb-4 flex size-12 items-center justify-center rounded-lg bg-accent/15">
             <HistoryIcon className="size-6 text-accent" />
           </span>
           <h2 className="text-lg font-semibold">Nothing logged yet</h2>

@@ -42,6 +42,7 @@ export type RoutineDay = {
 
 export type Routine = {
   id: string
+  is_active: boolean
   week_start_date: string
   generated_by_model: string | null
   created_at: string
@@ -49,7 +50,7 @@ export type Routine = {
 }
 
 const ROUTINE_SELECT = `
-  id, week_start_date, generated_by_model, created_at,
+  id, is_active, week_start_date, generated_by_model, created_at,
   routine_days (
     id, day_of_week, name, is_rest_day,
     routine_exercises (
@@ -77,25 +78,8 @@ export async function getPreferences(supabase: Client, userId: string) {
   return data
 }
 
-/** The routine covering a given week, with days and exercises sorted. */
-export async function getRoutineForWeek(
-  supabase: Client,
-  userId: string,
-  weekStart: string,
-): Promise<Routine | null> {
-  const { data } = await supabase
-    .from('routines')
-    .select(ROUTINE_SELECT)
-    .eq('user_id', userId)
-    .eq('week_start_date', weekStart)
-    .maybeSingle()
-
-  if (!data) return null
-  return sortRoutine(data as unknown as Routine)
-}
-
-/** The most recent routine, whichever week it belongs to. */
-export async function getLatestRoutine(
+/** The user's one recurring training plan, with days and exercises sorted. */
+export async function getActiveRoutine(
   supabase: Client,
   userId: string,
 ): Promise<Routine | null> {
@@ -103,8 +87,7 @@ export async function getLatestRoutine(
     .from('routines')
     .select(ROUTINE_SELECT)
     .eq('user_id', userId)
-    .order('week_start_date', { ascending: false })
-    .limit(1)
+    .eq('is_active', true)
     .maybeSingle()
 
   if (!data) return null
@@ -123,33 +106,18 @@ function sortRoutine(routine: Routine): Routine {
   return { ...routine, routine_days: days }
 }
 
-/** Routine day plans and completed dates needed to compute the streak. */
+/** Completed dates needed to compute the recurring-plan streak. */
 export async function getStreakSource(supabase: Client, userId: string) {
   const from = toDateKey(addDays(today(), -200))
 
-  const [{ data: routines }, { data: sessions }] = await Promise.all([
-    supabase
-      .from('routines')
-      // created_at gates retroactive rest days — see computeStreak.
-      .select(
-        'week_start_date, created_at, routine_days (day_of_week, is_rest_day)',
-      )
-      .eq('user_id', userId)
-      .gte('week_start_date', from),
-    supabase
-      .from('workout_sessions')
-      .select('performed_on')
-      .eq('user_id', userId)
-      .not('completed_at', 'is', null)
-      .gte('performed_on', from),
-  ])
+  const { data: sessions } = await supabase
+    .from('workout_sessions')
+    .select('performed_on')
+    .eq('user_id', userId)
+    .not('completed_at', 'is', null)
+    .gte('performed_on', from)
 
   return {
-    routines: (routines ?? []) as {
-      week_start_date: string
-      created_at: string
-      routine_days: { day_of_week: number; is_rest_day: boolean }[]
-    }[],
     completedDates: new Set((sessions ?? []).map((s) => s.performed_on)),
   }
 }

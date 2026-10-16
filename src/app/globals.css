@@ -1,15 +1,16 @@
 @import 'tailwindcss';
 
-/* The app palette follows the RepCadence mark: near-black surfaces, white type, and training green. */
+/* RepCadence uses the mark's near-black field and training green deliberately:
+   structure stays neutral; green identifies action, progress, and selection. */
 :root {
-  --background: #080a09;
-  --foreground: #f3f6f3;
-  --muted: #9aa69e;
-  --surface: #101411;
-  --surface-2: #171d19;
-  --border: #27332b;
+  --background: #090b09;
+  --foreground: #f5f7f4;
+  --muted: #9ca69f;
+  --surface: #111511;
+  --surface-2: #171c17;
+  --border: #2a342c;
   --accent: #70e89a;
-  --accent-strong: #42bd70;
+  --accent-strong: #57cf81;
   --danger: #fb807a;
 }
 
@@ -34,17 +35,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.marketing-grid {
-  background-image:
-    linear-gradient(to right, rgb(39 51 43 / 0.55) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(39 51 43 / 0.55) 1px, transparent 1px);
-  background-size: 3.5rem 3.5rem;
-  mask-image: linear-gradient(to bottom, black, transparent 72%);
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--foreground);
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-edge bg-surface p-5;
+    @apply rounded-lg border border-edge bg-surface p-5;
   }
 
   .label {
@@ -52,10 +50,10 @@ body {
   }
 
   .input {
-    @apply w-full rounded-xl border border-edge bg-surface-2 px-3.5 py-2.5
+    @apply w-full rounded-lg border border-edge bg-surface-2 px-3.5 py-2.5
            text-[15px] text-foreground placeholder:text-muted/60
-           outline-none transition
-           focus:border-accent/60 focus:ring-2 focus:ring-accent/20;
+           outline-none transition-colors
+           focus:border-accent/70 focus:ring-2 focus:ring-accent/20;
   }
 
   /* Tailwind v4's @apply only accepts real utilities, not other component
@@ -64,26 +62,25 @@ body {
   .btn-primary,
   .btn-ghost,
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-           text-sm font-semibold transition disabled:cursor-not-allowed
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-semibold transition-colors disabled:cursor-not-allowed
            disabled:opacity-50 focus-visible:outline-none
            focus-visible:ring-2 focus-visible:ring-accent/60
            focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .btn-primary {
-    @apply bg-linear-to-r from-accent to-accent-strong text-slate-950
-           hover:brightness-110;
+    @apply bg-accent text-[#08120c] hover:bg-[#8cedad] active:bg-accent-strong;
   }
 
   .btn-ghost {
-    @apply border border-edge bg-surface-2 text-foreground
-           hover:border-accent/40;
+    @apply border border-edge bg-transparent text-foreground
+           hover:border-foreground/25 hover:bg-surface-2;
   }
 
   .btn-danger {
     @apply border border-danger/30 bg-danger/10 text-danger
-           hover:bg-danger/20;
+           hover:border-danger/50 hover:bg-danger/20;
   }
 
   /* Hide number-input spinners — set/rep fields are thumb-driven. */
@@ -95,5 +92,16 @@ body {
   .no-spin {
     -moz-appearance: textfield;
     appearance: textfield;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

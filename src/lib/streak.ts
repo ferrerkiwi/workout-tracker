@@ -1,4 +1,4 @@
-import { addDays, mondayIndex, startOfWeek, toDateKey, today } from './week'
+import { addDays, mondayIndex, toDateKey, today } from './week'
 
 export type PlanDay = {
   isRest: boolean
@@ -11,15 +11,9 @@ export type PlanDay = {
 }
 
 /**
- * A day's plan, keyed by `YYYY-MM-DD` of the week's Monday and day index.
- * Built from routines + routine_days.
+ * A day's recurring plan, keyed by the Monday-based day index.
  */
-export type PlanLookup = Map<string, PlanDay>
-
-/** Key for the plan lookup: `${weekStart}#${dayIndex}`. */
-export function planKey(weekStart: string, dayIndex: number): string {
-  return `${weekStart}#${dayIndex}`
-}
+export type PlanLookup = Map<number, PlanDay>
 
 /** Hard stop so a data gap can never spin this loop forever. */
 const MAX_LOOKBACK_DAYS = 730
@@ -27,7 +21,7 @@ const MAX_LOOKBACK_DAYS = 730
 export type StreakInput = {
   /** `YYYY-MM-DD` for every session with a `completed_at`. */
   completedDates: Set<string>
-  /** `${weekStart}#${dayIndex}` -> is_rest_day. Absent = no routine that day. */
+  /** Monday-based day index -> is_rest_day. Absent = no active routine that day. */
   plan: PlanLookup
 }
 
@@ -53,8 +47,7 @@ export function computeStreak({ completedDates, plan }: StreakInput): number {
   for (let i = 0; i < MAX_LOOKBACK_DAYS; i++) {
     const date = addDays(start, -i)
     const key = toDateKey(date)
-    const weekStart = toDateKey(startOfWeek(date))
-    const day = plan.get(planKey(weekStart, mondayIndex(date)))
+    const day = plan.get(mondayIndex(date))
 
     // Logged work always counts — it happened, whatever the plan said.
     if (completedDates.has(key)) {
@@ -75,24 +68,23 @@ export function computeStreak({ completedDates, plan }: StreakInput): number {
   return streak
 }
 
-/** Builds the plan lookup from joined routine rows. */
-export function buildPlanLookup(
-  routines: {
-    week_start_date: string
+/** Builds the recurring plan lookup from the user's active routine. */
+export function buildRecurringPlanLookup(
+  routine: {
     created_at: string
     routine_days: { day_of_week: number; is_rest_day: boolean }[]
-  }[],
+  } | null,
 ): PlanLookup {
   const plan: PlanLookup = new Map()
-  for (const routine of routines) {
-    // created_at is a timestamp; the streak compares whole days.
-    const planCreatedOn = routine.created_at.slice(0, 10)
-    for (const day of routine.routine_days ?? []) {
-      plan.set(planKey(routine.week_start_date, day.day_of_week), {
-        isRest: day.is_rest_day,
-        planCreatedOn,
-      })
-    }
+  if (!routine) return plan
+
+  // created_at is a timestamp; the streak compares whole days.
+  const planCreatedOn = routine.created_at.slice(0, 10)
+  for (const day of routine.routine_days ?? []) {
+    plan.set(day.day_of_week, {
+      isRest: day.is_rest_day,
+      planCreatedOn,
+    })
   }
   return plan
 }

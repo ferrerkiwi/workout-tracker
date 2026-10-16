@@ -16,9 +16,6 @@ type GuidedSetStatus =
   | 'ready'
   | 'running'
   | 'paused'
-  | 'saving'
-  | 'finished'
-  | 'error'
 
 type SpeechRecognitionResultLike = ArrayLike<{ transcript: string }> & {
   isFinal: boolean
@@ -71,7 +68,7 @@ export function GuidedSet({
   targetReps,
   weight,
   unit,
-  onSave,
+  onComplete,
   onClose,
 }: {
   exerciseName: string
@@ -79,7 +76,7 @@ export function GuidedSet({
   targetReps: number
   weight: string
   unit: string
-  onSave: (completedReps: number) => Promise<void>
+  onComplete: (completedReps: number) => void
   onClose: () => void
 }) {
   const [status, setStatus] = useState<GuidedSetStatus>('idle')
@@ -87,7 +84,6 @@ export function GuidedSet({
   const [voiceStatus, setVoiceStatus] = useState<
     'checking' | 'listening' | 'unsupported' | 'unavailable'
   >('checking')
-  const [saveError, setSaveError] = useState<string | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
@@ -98,11 +94,9 @@ export function GuidedSet({
   const accumulatedMsRef = useRef(0)
   const lastCueSecondRef = useRef(-1)
   const stoppingRef = useRef(false)
-  const mountedRef = useRef(true)
   const voiceCanRestartRef = useRef(true)
   const voiceRestartCountRef = useRef(0)
   const finishSetRef = useRef<() => Promise<void>>(() => Promise.resolve())
-  const [completedAtStop, setCompletedAtStop] = useState(0)
 
   const stopAnimation = useCallback(() => {
     if (animationFrameRef.current !== null) {
@@ -270,33 +264,18 @@ export function GuidedSet({
     startRunning()
   }, [clearReadyTimeout, startRunning, stopRecognition])
 
-  const saveCompletedReps = useCallback(async (completedReps: number) => {
-    if (stoppingRef.current) return
+  const finishSet = useCallback(async () => {
+    if (stoppingRef.current || !['ready', 'running', 'paused'].includes(status)) return
     stoppingRef.current = true
+    const reps = status === 'ready' ? 0 : getCompletedReps(currentElapsed())
     stopAnimation()
+    clearReadyTimeout()
+    readyStartedAtRef.current = null
     stopRecognition()
     releaseWakeLock()
     closeAudio()
-    setCompletedAtStop(completedReps)
-    setStatus('saving')
-    setSaveError(null)
-
-    try {
-      await onSave(completedReps)
-      if (mountedRef.current) setStatus('finished')
-    } catch (error) {
-      stoppingRef.current = false
-      if (mountedRef.current) {
-        setSaveError(error instanceof Error ? error.message : 'Could not save this set.')
-        setStatus('error')
-      }
-    }
-  }, [closeAudio, onSave, releaseWakeLock, stopAnimation, stopRecognition])
-
-  const finishSet = useCallback(async () => {
-    if (stoppingRef.current || (status !== 'running' && status !== 'paused')) return
-    await saveCompletedReps(getCompletedReps(currentElapsed()))
-  }, [currentElapsed, saveCompletedReps, status])
+    onComplete(reps)
+  }, [clearReadyTimeout, closeAudio, currentElapsed, onComplete, releaseWakeLock, status, stopAnimation, stopRecognition])
 
   useEffect(() => {
     finishSetRef.current = finishSet
@@ -306,7 +285,6 @@ export function GuidedSet({
     // React Strict Mode intentionally replays effects in development. A prior
     // cleanup must never leave the next user-started set marked as stopping.
     stoppingRef.current = false
-    mountedRef.current = true
     const AudioContextClass =
       window.AudioContext ??
       (window as Window & { webkitAudioContext?: typeof AudioContext })
@@ -388,10 +366,8 @@ export function GuidedSet({
   }, [completeReadyCountdown, status])
 
   useEffect(() => {
-    mountedRef.current = true
 
     return () => {
-      mountedRef.current = false
       stoppingRef.current = true
 
       if (animationFrameRef.current !== null) {
@@ -429,19 +405,19 @@ export function GuidedSet({
   const snapshot = getTempoSnapshot(elapsedMs)
   const phase = phaseCopy(snapshot.phase)
   const readyCountdown = getReadyCountdown(elapsedMs)
-  const canStop = status === 'running' || status === 'paused'
+  const canStop = status === 'ready' || status === 'running' || status === 'paused'
 
   return (
     <div
-      className="fixed inset-0 z-50 flex min-h-dvh items-stretch bg-background/98 p-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-8"
+      className="fixed inset-0 z-50 flex min-h-dvh items-stretch bg-background p-0 sm:items-center sm:justify-center sm:p-8"
       role="dialog"
       aria-modal="true"
       aria-label={`Guided set for ${exerciseName}`}
     >
-      <div className="flex w-full max-w-xl flex-1 flex-col border border-edge bg-surface sm:max-h-[48rem] sm:flex-none sm:rounded-2xl">
-        <header className="flex items-start justify-between border-b border-edge px-5 py-4">
+      <div className="flex max-h-dvh w-full max-w-xl flex-1 flex-col overflow-hidden border border-edge bg-surface sm:max-h-[calc(100dvh-4rem)] sm:flex-none sm:rounded-lg">
+        <header className="flex shrink-0 items-start justify-between border-b border-edge border-l-2 border-l-accent px-5 py-4">
           <div>
-            <p className="text-sm font-medium text-accent">Guided set</p>
+            <p className="text-sm font-semibold text-accent">Guided set</p>
             <h2 className="mt-1 text-xl font-bold">{exerciseName}</h2>
             <p className="mt-1 text-sm text-muted">
               Set {setNumber} · Target: {targetReps} reps
@@ -450,16 +426,16 @@ export function GuidedSet({
           </div>
           <button
             type="button"
-            className="btn-ghost px-3"
+            className="btn-ghost size-10 px-0"
             onClick={cancel}
-            disabled={status === 'saving'}
             aria-label="Cancel guided set"
           >
             <X className="size-5" />
           </button>
         </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
+        <main className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex min-h-full flex-col items-center justify-center px-6 py-4 text-center">
           {status === 'idle' ? (
             <>
               <Volume2 className="size-10 text-accent" />
@@ -500,53 +476,15 @@ export function GuidedSet({
                 Resume set
               </button>
             </>
-          ) : status === 'saving' || status === 'finished' || status === 'error' ? (
-            <>
-              <p className="text-sm font-semibold text-accent">
-                {status === 'saving'
-                  ? 'SAVING SET'
-                  : status === 'finished'
-                    ? 'SET SAVED'
-                    : 'SAVE FAILED'}
-              </p>
-              <p className="mt-5 text-7xl font-bold tabular-nums">
-                {completedAtStop}
-              </p>
-              <p className="mt-2 text-lg text-muted">completed reps</p>
-              {status === 'error' && (
-                <p className="mt-5 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-                  {saveError}
-                </p>
-              )}
-              {status === 'finished' ? (
-                <button
-                  type="button"
-                  className="btn-primary mt-8 min-h-14 px-8 text-base"
-                  onClick={onClose}
-                >
-                  Back to workout
-                </button>
-              ) : status === 'error' ? (
-                <button
-                  type="button"
-                  className="btn-primary mt-8 min-h-14 px-8 text-base"
-                  onClick={() => void saveCompletedReps(completedAtStop)}
-                >
-                  Retry save
-                </button>
-              ) : null}
-            </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-accent">REP {snapshot.completedReps + 1}</p>
-              <p className="mt-5 text-7xl font-bold tabular-nums">{snapshot.completedReps}</p>
-              <p className="text-sm text-muted">completed reps</p>
-              <p className="mt-10 text-4xl font-bold">{phase.label}</p>
-              <p className="mt-2 text-base text-muted">{phase.description}</p>
-              <p className="mt-5 text-8xl font-bold tabular-nums text-accent">
+              <p className="text-sm font-semibold text-accent">{snapshot.completedReps} completed reps · Rep {snapshot.completedReps + 1}</p>
+              <p className="mt-4 text-4xl font-bold">{phase.label}</p>
+              <p className="mt-2 text-sm text-muted">{phase.description}</p>
+              <p className="mt-3 text-7xl font-bold tabular-nums text-accent">
                 {snapshot.phaseCountdown}
               </p>
-              <div className="mt-8 flex items-center gap-2 text-sm text-muted" aria-live="polite">
+              <div className="mt-4 flex items-center gap-2 text-xs text-muted" aria-live="polite">
                 {voiceStatus === 'listening' ? (
                   <Mic className="size-4 text-accent" />
                 ) : (
@@ -562,10 +500,11 @@ export function GuidedSet({
               </div>
             </>
           )}
+          </div>
         </main>
 
         {canStop && (
-          <footer className="border-t border-edge p-5">
+          <footer className="shrink-0 border-t border-edge p-5">
             <button
               type="button"
               onClick={() => void finishSet()}
@@ -578,7 +517,7 @@ export function GuidedSet({
               onClick={cancel}
               className="mt-3 w-full py-2 text-sm font-medium text-muted hover:text-foreground"
             >
-              Cancel without saving
+              Back to set timer
             </button>
           </footer>
         )}

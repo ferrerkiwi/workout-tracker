@@ -22,7 +22,7 @@ export default async function OnboardingPage() {
     <main className="mx-auto w-full max-w-2xl px-4 py-12">
       <header className="mb-8">
         <p className="text-sm font-medium text-accent">Getting set up</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">
+        <h1 className="mt-1 text-3xl font-bold">
           {profile?.display_name ? `Hi ${profile.display_name}.` : 'Hi.'} Tell me
           how you train.
         </h1>

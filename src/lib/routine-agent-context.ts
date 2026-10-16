@@ -1,13 +1,12 @@
 import { DAY_NAMES, experienceLabel, goalLabels } from '@/lib/constants'
 import {
   formatTarget,
+  getActiveRoutine,
   getPreferences,
   getProfile,
   type Routine,
 } from '@/lib/queries'
 import type { Client } from '@/lib/queries'
-import { ensureCurrentRoutine } from '@/lib/routine-initialization'
-import { startOfWeek, toDateKey, today } from '@/lib/week'
 
 export type RoutineAgentContext = {
   routine: Routine | null
@@ -18,11 +17,10 @@ export async function loadRoutineAgentContext(
   supabase: Client,
   userId: string,
 ): Promise<RoutineAgentContext> {
-  const weekStart = toDateKey(startOfWeek(today()))
   const [profile, preferences, routine] = await Promise.all([
     getProfile(supabase, userId),
     getPreferences(supabase, userId),
-    ensureCurrentRoutine(supabase, userId),
+    getActiveRoutine(supabase, userId),
   ])
 
   const unit = profile?.unit_preference ?? 'lbs'
@@ -61,18 +59,17 @@ export async function loadRoutineAgentContext(
         }),
         day.routine_exercises.length === 0 ? '  No exercises.' : '',
       ])
-    : ['No routine exists for the current week.']
+    : ['No active routine exists.']
 
   return {
     routine,
     text: [
-      `Current week start: ${weekStart}`,
       `Units: ${unit}`,
       '',
       'User preferences:',
       ...preferenceLines,
       '',
-      'Current weekly routine:',
+      'Current recurring routine:',
       ...routineLines,
     ].join('\n'),
   }

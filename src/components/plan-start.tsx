@@ -74,7 +74,7 @@ export function PlanStart({
   return (
     <div className="space-y-4">
       <p className="text-muted">
-        No plan for this week yet. How would you like to start?
+        No routine yet. How would you like to start?
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -84,12 +84,12 @@ export function PlanStart({
           className="card flex flex-col items-start gap-2 text-left transition
                      hover:border-accent/50 disabled:opacity-50"
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-accent/15">
+          <span className="flex size-10 items-center justify-center rounded-lg bg-accent/15">
             <Sparkles className="size-5 text-accent" />
           </span>
           <span className="mt-1 font-semibold">Generate one for me</span>
           <span className="text-sm text-muted">
-            Builds a week from your preferences. You can edit anything
+            Builds a recurring weekly routine from your preferences. You can edit anything
             afterwards.
           </span>
         </button>
@@ -100,7 +100,7 @@ export function PlanStart({
           className="card flex flex-col items-start gap-2 text-left transition
                      hover:border-accent/50 disabled:opacity-50"
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-surface-2">
+          <span className="flex size-10 items-center justify-center rounded-lg bg-surface-2">
             {building ? (
               <Loader2 className="size-5 animate-spin text-muted" />
             ) : (
@@ -109,7 +109,7 @@ export function PlanStart({
           </span>
           <span className="mt-1 font-semibold">Build my own</span>
           <span className="text-sm text-muted">
-            Starts with an empty week. Turn off rest days and add your own
+            Starts with an empty recurring schedule. Turn off rest days and add your own
             exercises.
           </span>
         </button>

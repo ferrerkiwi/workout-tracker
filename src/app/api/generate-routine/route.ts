@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { NextResponse } from 'next/server'
 import { generatedRoutineSchema, normaliseDays } from '@/lib/routine-schema'
+import { isAnonymousUser } from '@/lib/demo'
 import { getPreferences, getProfile } from '@/lib/queries'
 import {
   buildRoutineUserPrompt,
@@ -18,6 +19,15 @@ export async function POST() {
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
+  }
+  if (isAnonymousUser(user)) {
+    return NextResponse.json(
+      {
+        error:
+          'Demo mode includes a ready-made routine. Use Routine Coach to explore focused plan edits.',
+      },
+      { status: 403 },
+    )
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY

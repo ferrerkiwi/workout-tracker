@@ -1,56 +1,14 @@
 import {
   ArrowRight,
-  Bot,
   CalendarDays,
   Check,
   ChevronRight,
-  ListChecks,
   Play,
-  Sparkles,
   Timer,
-  TrendingUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import { BrandMark } from '@/components/brand-mark'
-
-const features = [
-  {
-    icon: Sparkles,
-    title: 'A plan built around you',
-    description:
-      'Start with your goals, experience, available equipment, schedule, and focus areas.',
-  },
-  {
-    icon: CalendarDays,
-    title: 'A week you can shape',
-    description:
-      'Edit training days, exercises, sets, reps, weights, order, and rest days whenever your week changes.',
-  },
-  {
-    icon: Bot,
-    title: 'A coach beside your plan',
-    description:
-      'Ask the Routine Coach to review your week or make a focused change to your current routine.',
-  },
-  {
-    icon: ListChecks,
-    title: 'Log the work that matters',
-    description:
-      'Record reps, loads, and timed work. Active workouts are ready when you come back.',
-  },
-  {
-    icon: Timer,
-    title: 'Guidance when you need it',
-    description:
-      'Use Guided Set for a clear 3-0-1 tempo, audio cues, and automatic completed-rep counting.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Keep your history close',
-    description:
-      'Review finished sessions, see previous work at a glance, and keep your training streak in view.',
-  },
-]
+import { DemoButton } from '@/components/demo-button'
 
 export function MarketingHome() {
   return (
@@ -58,9 +16,8 @@ export function MarketingHome() {
       <MarketingHeader />
       <main>
         <Hero />
-        <Features />
+        <Workflow />
         <PlanShowcase />
-        <HowItWorks />
         <GuidedSetShowcase />
         <FinalCta />
       </main>
@@ -72,7 +29,7 @@ export function MarketingHome() {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5 font-semibold">
-      <BrandMark size={36} className="rounded-lg shadow-lg shadow-black/35" />
+      <BrandMark size={36} className="rounded-lg" />
       <span className={compact ? 'hidden sm:inline' : undefined}>RepCadence</span>
     </span>
   )
@@ -80,7 +37,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
 
 function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-edge/70 bg-background/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-edge bg-background/95">
       <nav
         className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6"
         aria-label="Main navigation"
@@ -89,20 +46,21 @@ function MarketingHeader() {
           <Brand compact />
         </Link>
         <div className="hidden items-center gap-7 text-sm text-muted md:flex">
-          <a className="transition hover:text-foreground" href="#features">
-            Features
-          </a>
-          <a className="transition hover:text-foreground" href="#how-it-works">
+          <a className="transition-colors hover:text-foreground" href="#workflow">
             How it works
           </a>
+          <a className="transition-colors hover:text-foreground" href="#guided-set">
+            Guided Set
+          </a>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           <Link
             href="/login"
-            className="px-2.5 py-2 text-sm font-semibold text-muted transition hover:text-foreground sm:px-3"
+            className="px-2 py-2 text-sm font-semibold text-muted transition-colors hover:text-foreground sm:px-3"
           >
             Log in
           </Link>
+          <DemoButton className="px-2 py-2 text-sm sm:px-3" />
           <Link href="/signup" className="btn-primary px-3 py-2 sm:px-4">
             <span className="hidden sm:inline">Get started</span>
             <span className="sm:hidden">Start</span>
@@ -116,41 +74,32 @@ function MarketingHeader() {
 
 function Hero() {
   return (
-    <section className="relative border-b border-edge">
-      <div className="marketing-grid absolute inset-0 opacity-40" aria-hidden="true" />
-      <div className="relative mx-auto grid min-h-[calc(100dvh-4rem)] max-w-6xl items-center gap-12 px-4 pt-12 pb-10 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,0.92fr)_minmax(30rem,1.08fr)] lg:gap-16 lg:pt-20">
+    <section className="border-b border-edge">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[minmax(0,0.85fr)_minmax(31rem,1.15fr)] lg:gap-16">
         <div className="max-w-xl">
-          <p className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
-            <Sparkles className="size-3.5" aria-hidden="true" />
-            Training, with a clearer next step
-          </p>
-          <h1 className="mt-6 text-5xl font-bold leading-[1.03] tracking-tight sm:text-6xl lg:text-7xl">
-            Plan smarter.
+          <p className="text-sm font-semibold text-accent">REPCADENCE</p>
+          <h1 className="mt-4 text-5xl font-bold leading-[1.06] sm:text-6xl">
+            Plan the week.
             <br />
-            <span className="text-accent">Train with intent.</span>
+            Log the work.
           </h1>
-          <p className="mt-6 max-w-lg text-lg leading-8 text-muted sm:text-xl">
-            Turn your training preferences into a practical weekly routine, then log the work that moves you forward.
+          <p className="mt-6 max-w-lg text-lg leading-8 text-muted">
+            Keep one recurring routine, record every set, and return to the
+            history that explains what you trained.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/signup" className="btn-primary min-h-12 px-5 text-base">
               Start training
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
-            <Link href="/login" className="btn-ghost min-h-12 px-5 text-base">
+            <DemoButton className="min-h-12 px-5 text-base" />
+            <Link href="/login" className="px-4 py-3 text-center text-sm font-semibold text-muted hover:text-foreground">
               Log in
             </Link>
           </div>
-          <div className="mt-10 flex items-center gap-5 text-sm text-muted">
-            <span className="flex items-center gap-2">
-              <Check className="size-4 text-accent" aria-hidden="true" />
-              Editable plans
-            </span>
-            <span className="flex items-center gap-2">
-              <Check className="size-4 text-accent" aria-hidden="true" />
-              Session logging
-            </span>
-          </div>
+          <p className="mt-7 text-sm text-muted">
+            One weekly plan, a focused workout log, and a history that stays useful.
+          </p>
         </div>
         <HeroPreview />
       </div>
@@ -160,105 +109,86 @@ function Hero() {
 
 function HeroPreview() {
   return (
-    <div className="relative mx-auto w-full max-w-xl lg:mx-0">
-      <section className="overflow-hidden rounded-2xl border border-edge bg-surface shadow-2xl shadow-black/30">
-        <div className="flex items-center justify-between border-b border-edge px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
-              <CalendarDays className="size-4" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="font-semibold">Weekly plan</p>
-              <p className="text-xs text-muted">Your training, organized</p>
-            </div>
-          </div>
-          <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
-            This week
-          </span>
-        </div>
-        <div className="grid gap-3 p-4 sm:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-xl border border-edge bg-surface-2 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium text-accent">MONDAY</p>
-                <h2 className="mt-1 font-semibold">Upper strength</h2>
-              </div>
-              <span className="rounded-md bg-background px-2 py-1 text-xs text-muted">
-                45 min
-              </span>
-            </div>
-            <div className="mt-4 space-y-2.5">
-              <ExerciseRow name="Bench press" detail="3 × 8" />
-              <ExerciseRow name="Dumbbell row" detail="3 × 10" />
-              <ExerciseRow name="Cable fly" detail="2 × 12" />
-            </div>
-            <div className="mt-4 flex items-center justify-between border-t border-edge pt-3 text-xs text-muted">
-              <span>3 exercises</span>
-              <span className="font-medium text-accent">Ready to train</span>
-            </div>
-          </div>
-          <div className="flex flex-col gap-3">
-            <div className="rounded-xl border border-edge bg-surface-2 p-4">
-              <p className="text-xs font-medium text-muted">NEXT UP</p>
-              <p className="mt-2 font-semibold">Lower body</p>
-              <p className="mt-1 text-sm text-muted">Wednesday · 5 exercises</p>
-            </div>
-            <div className="rounded-xl border border-accent/25 bg-accent/10 p-4">
-              <div className="flex items-center gap-2 text-accent">
-                <Bot className="size-4" aria-hidden="true" />
-                <p className="text-sm font-semibold">Routine coach</p>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-foreground/90">
-                “Want to swap an exercise or adjust the week?”
-              </p>
-              <div className="mt-4 flex items-center gap-2 text-xs text-accent">
-                <span className="size-2 rounded-full bg-accent" />
-                Ready to help
-              </div>
-            </div>
+    <section className="overflow-hidden rounded-lg border border-edge bg-surface">
+      <div className="flex items-center justify-between border-b border-edge px-5 py-4">
+        <div className="flex items-center gap-3">
+          <CalendarDays className="size-4 text-accent" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Weekly plan</p>
+            <p className="text-xs text-muted">Your recurring routine</p>
           </div>
         </div>
-      </section>
-    </div>
+        <span className="text-xs font-medium text-accent">This week</span>
+      </div>
+      <div className="grid divide-y divide-edge sm:grid-cols-[1.15fr_0.85fr] sm:divide-x sm:divide-y-0">
+        <div className="p-5">
+          <p className="text-sm font-medium text-accent">MONDAY</p>
+          <h2 className="mt-1 text-xl font-semibold">Upper strength</h2>
+          <div className="mt-5 divide-y divide-edge border-y border-edge">
+            <PreviewExercise name="Bench press" detail="3 × 8 · 135 lb" />
+            <PreviewExercise name="Dumbbell row" detail="3 × 10 · 50 lb" />
+            <PreviewExercise name="Cable fly" detail="2 × 12 · 25 lb" />
+          </div>
+          <div className="mt-5 flex items-center justify-between text-sm">
+            <span className="text-muted">3 exercises</span>
+            <span className="font-medium text-accent">Ready to train</span>
+          </div>
+        </div>
+        <div className="flex flex-col justify-between p-5">
+          <div>
+            <p className="text-sm font-medium text-muted">Next session</p>
+            <p className="mt-2 text-lg font-semibold">Lower body</p>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              Wednesday · 5 exercises · 60 minutes
+            </p>
+          </div>
+          <div className="mt-8 border-t border-edge pt-4">
+            <p className="text-sm font-medium">One routine. Clear history.</p>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Edit the plan when life changes. Logged workouts remain where
+              they belong.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
-function ExerciseRow({ name, detail }: { name: string; detail: string }) {
+function PreviewExercise({ name, detail }: { name: string; detail: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-surface px-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 py-3">
       <span className="min-w-0 truncate text-sm font-medium">{name}</span>
       <span className="shrink-0 text-sm text-muted">{detail}</span>
     </div>
   )
 }
 
-function Features() {
+function Workflow() {
+  const steps = [
+    ['01', 'Set the inputs that actually matter', 'Goals, experience, schedule, equipment, and priorities.'],
+    ['02', 'Keep an editable weekly plan', 'Adjust a day, an exercise, or a load without starting a new week.'],
+    ['03', 'Log the session in front of you', 'Record sets, use Guided Set when useful, and finish with a clean history entry.'],
+  ]
+
   return (
-    <section id="features" className="scroll-mt-20 border-b border-edge py-20 sm:py-28">
+    <section id="workflow" className="scroll-mt-20 border-b border-edge py-18 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold text-accent">BUILT FOR THE FULL WEEK</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            More than a place to write down sets.
+          <p className="text-sm font-semibold text-accent">THE WORKFLOW</p>
+          <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+            Built around training, not managing software.
           </h2>
-          <p className="mt-4 text-lg leading-8 text-muted">
-            Everything in the tracker is designed to keep planning, training, and reflection connected.
-          </p>
         </div>
-        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ icon: Icon, title, description }) => (
-            <article
-              key={title}
-              className="rounded-xl border border-edge bg-surface p-5 transition hover:border-accent/35 hover:bg-surface-2"
-            >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                <Icon className="size-5" aria-hidden="true" />
-              </span>
-              <h3 className="mt-5 text-lg font-semibold">{title}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-            </article>
+        <ol className="mt-10 divide-y divide-edge border-y border-edge">
+          {steps.map(([number, title, description]) => (
+            <li key={number} className="grid gap-3 py-5 sm:grid-cols-[5rem_minmax(0,1fr)_minmax(16rem,0.8fr)] sm:items-baseline">
+              <p className="font-mono text-sm text-accent">{number}</p>
+              <h3 className="text-lg font-semibold">{title}</h3>
+              <p className="text-sm leading-6 text-muted">{description}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </section>
   )
@@ -266,29 +196,26 @@ function Features() {
 
 function PlanShowcase() {
   return (
-    <section className="border-b border-edge py-20 sm:py-28">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20">
-        <div className="order-2 lg:order-1">
-          <PlanEditorPreview />
-        </div>
-        <div className="order-1 max-w-xl lg:order-2">
-          <p className="text-sm font-semibold text-accent">YOUR WEEK, YOUR CALL</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            Keep the plan flexible without losing the thread.
+    <section className="border-b border-edge py-18 sm:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(20rem,0.7fr)] lg:gap-20">
+        <PlanEditorPreview />
+        <div className="max-w-xl">
+          <p className="text-sm font-semibold text-accent">WEEKLY PLAN</p>
+          <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+            Edit details without losing the program.
           </h2>
           <p className="mt-5 text-lg leading-8 text-muted">
-            A generated starting point is useful. The ability to make it yours is what makes it practical week after week.
+            Training days stay readable as a week. Exercise rows keep sets,
+            reps, time, and load close together.
           </p>
-          <ul className="mt-7 space-y-3 text-sm text-muted">
+          <ul className="mt-7 divide-y divide-edge border-y border-edge text-sm">
             {[
-              'Adjust exercises, sets, reps, and loads',
-              'Reorder movements and mark training or rest days',
-              'Use the Routine Coach for focused plan edits',
+              'Change a movement, then keep the rest of the plan intact',
+              'Switch a set between reps and time',
+              'Use the coach for a focused edit when you need it',
             ].map((item) => (
-              <li key={item} className="flex items-start gap-3">
-                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-                  <Check className="size-3" aria-hidden="true" />
-                </span>
+              <li key={item} className="flex items-start gap-3 py-3 text-muted">
+                <Check className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
                 <span>{item}</span>
               </li>
             ))}
@@ -305,92 +232,62 @@ function PlanShowcase() {
 
 function PlanEditorPreview() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-edge bg-surface shadow-xl shadow-black/20">
+    <section className="overflow-hidden rounded-lg border border-edge bg-surface">
       <div className="flex items-center justify-between border-b border-edge px-5 py-4">
         <div>
           <p className="font-semibold">Upper strength</p>
           <p className="mt-0.5 text-sm text-muted">Monday · 3 exercises</p>
         </div>
-        <span className="rounded-md bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">Active</span>
+        <span className="text-xs font-medium text-accent">Active</span>
       </div>
-      <div className="space-y-3 p-4">
+      <div className="divide-y divide-edge">
         {[
           ['Bench press', '3', '8', '135'],
           ['Dumbbell row', '3', '10', '50'],
           ['Cable fly', '2', '12', '25'],
         ].map(([name, sets, reps, load]) => (
-          <div key={name} className="rounded-xl border border-edge bg-surface-2 p-3">
+          <div key={name} className="px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <p className="font-medium">{name}</p>
               <span className="text-xs text-muted">Reps</span>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
               <Metric label="Sets" value={sets} />
               <Metric label="Reps" value={reps} />
-              <Metric label="lbs" value={load} />
+              <Metric label="Load" value={`${load} lb`} />
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   )
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="mb-1 text-left text-muted">{label}</p>
-      <p className="rounded-md border border-edge bg-surface px-2 py-2 text-sm font-medium">{value}</p>
+      <p className="text-xs text-muted">{label}</p>
+      <p className="mt-1 font-semibold tabular-nums">{value}</p>
     </div>
-  )
-}
-
-function HowItWorks() {
-  const steps = [
-    ['01', 'Set your training preferences', 'Share your goals, experience, schedule, equipment, and focus areas.'],
-    ['02', 'Start with a weekly plan', 'Generate a practical routine, then adjust every detail until it fits.'],
-    ['03', 'Train and log the session', 'Record sets as you go, with Guided Set available for rep-based work.'],
-    ['04', 'Use your history to keep going', 'Review completed workouts and return to your next planned session.'],
-  ]
-
-  return (
-    <section id="how-it-works" className="scroll-mt-20 border-b border-edge py-20 sm:py-28">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-accent">HOW IT WORKS</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">A clearer routine from day one.</h2>
-          </div>
-          <p className="max-w-sm text-sm leading-6 text-muted">
-            Simple enough to start quickly, structured enough to keep your training organized.
-          </p>
-        </div>
-        <ol className="mt-10 grid gap-px overflow-hidden rounded-xl border border-edge bg-edge sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map(([number, title, description]) => (
-            <li key={number} className="min-h-52 bg-surface p-5">
-              <p className="font-mono text-sm text-accent">{number}</p>
-              <h3 className="mt-8 text-lg font-semibold">{title}</h3>
-              <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
   )
 }
 
 function GuidedSetShowcase() {
   return (
-    <section className="border-b border-edge py-20 sm:py-28">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+    <section id="guided-set" className="scroll-mt-20 border-b border-edge py-18 sm:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(19rem,0.75fr)_minmax(0,0.8fr)] lg:gap-20">
         <div className="max-w-xl">
-          <p className="text-sm font-semibold text-accent">WHEN YOU WANT A STEADY PACE</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Keep the tempo. Keep your focus.</h2>
+          <p className="text-sm font-semibold text-accent">GUIDED SET</p>
+          <h2 className="mt-3 text-3xl font-bold sm:text-4xl">
+            Hold a pace without watching the clock.
+          </h2>
           <p className="mt-5 text-lg leading-8 text-muted">
-            Guided Set gives rep-based movements a simple 3-second lower and 1-second lift rhythm, with visual and audio cues as you train.
+            For rep-based movements, a three-second lower and one-second lift
+            keep the set moving. Full cycles count. You decide when it ends.
           </p>
           <p className="mt-5 text-sm leading-6 text-muted">
-            Completed reps are counted locally as full tempo cycles. You stay in control with a manual Stop Set button, and compatible browsers can also listen for “stop.”
+            Audio and voice stopping are optional browser enhancements. The
+            visual tempo and large Stop Set control always remain available.
           </p>
         </div>
         <GuidedSetPreview />
@@ -401,32 +298,27 @@ function GuidedSetShowcase() {
 
 function GuidedSetPreview() {
   return (
-    <section className="mx-auto w-full max-w-md overflow-hidden rounded-2xl border border-edge bg-surface shadow-xl shadow-black/20">
-      <div className="border-b border-edge p-5">
-        <div className="flex items-center gap-2 text-accent">
-          <Timer className="size-5" aria-hidden="true" />
-          <p className="text-sm font-semibold">Guided set</p>
-        </div>
-        <h3 className="mt-3 text-xl font-bold">Bench press</h3>
-        <p className="mt-1 text-sm text-muted">Set 2 · Target: 10 reps · 135 lbs</p>
+    <section className="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-edge bg-surface">
+      <div className="border-b border-edge border-l-2 border-l-accent px-5 py-4">
+        <p className="text-sm font-semibold text-accent">Guided set</p>
+        <h3 className="mt-2 text-xl font-bold">Bench press</h3>
+        <p className="mt-1 text-sm text-muted">Set 2 · Target: 10 reps · 135 lb</p>
       </div>
       <div className="px-6 py-8 text-center">
         <p className="text-sm font-semibold text-accent">REP 4</p>
         <p className="mt-4 text-6xl font-bold tabular-nums">3</p>
         <p className="mt-1 text-sm text-muted">completed reps</p>
-        <p className="mt-8 text-3xl font-bold">LOWER</p>
+        <p className="mt-8 text-4xl font-bold">LOWER</p>
         <p className="mt-2 text-sm text-muted">Controlled eccentric</p>
         <p className="mt-4 text-7xl font-bold tabular-nums text-accent">2</p>
         <p className="mt-7 flex items-center justify-center gap-2 text-sm text-muted">
-          <span className="size-2 rounded-full bg-accent" />
-          Listening for “stop”
+          <Timer className="size-4 text-accent" aria-hidden="true" />
+          Voice stop is listening
         </p>
       </div>
       <div className="border-t border-edge p-5">
-        <div className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-danger/30 bg-danger/10 text-sm font-semibold text-danger">
-          <span className="flex size-7 items-center justify-center rounded-md bg-danger/15">
-            <Play className="size-3 fill-current" aria-hidden="true" />
-          </span>
+        <div className="flex min-h-14 items-center justify-center gap-2 rounded-lg border border-danger/30 bg-danger/10 text-sm font-semibold text-danger">
+          <Play className="size-4 fill-current" aria-hidden="true" />
           Stop Set
         </div>
       </div>
@@ -436,23 +328,22 @@ function GuidedSetPreview() {
 
 function FinalCta() {
   return (
-    <section className="py-20 sm:py-28">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="overflow-hidden rounded-2xl border border-accent/30 bg-surface px-6 py-12 text-center shadow-xl shadow-accent/5 sm:px-12 sm:py-16">
-          <BrandMark size={44} className="mx-auto rounded-xl shadow-lg shadow-black/35" />
-          <h2 className="mx-auto mt-5 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
-            Ready to build your next training week?
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-muted">
-            Start with the way you actually train, then make the plan yours.
-          </p>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/signup" className="btn-primary min-h-12 px-5 text-base">
-              Create your account
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-            <Link href="/login" className="btn-ghost min-h-12 px-5 text-base">Log in</Link>
-          </div>
+    <section className="py-18 sm:py-24">
+      <div className="mx-auto max-w-6xl border-y border-edge px-4 py-12 sm:px-6 sm:py-16">
+        <BrandMark size={44} className="rounded-lg" />
+        <h2 className="mt-5 max-w-2xl text-3xl font-bold sm:text-4xl">
+          Start with your actual training week.
+        </h2>
+        <p className="mt-4 max-w-xl text-lg leading-8 text-muted">
+          Try the full product with demo data, or build a routine around your
+          own schedule.
+        </p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <DemoButton className="min-h-12 px-5 text-base" />
+          <Link href="/signup" className="btn-primary min-h-12 px-5 text-base">
+            Create an account
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
         </div>
       </div>
     </section>
@@ -464,7 +355,7 @@ function MarketingFooter() {
     <footer className="border-t border-edge">
       <div className="mx-auto flex max-w-6xl flex-col justify-between gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:px-6">
         <Brand />
-        <p className="text-muted">Plan your week. Log the work. Keep moving.</p>
+        <p className="text-muted">Plan your week. Log the work.</p>
         <p className="text-muted">© {new Date().getFullYear()} RepCadence</p>
       </div>
     </footer>

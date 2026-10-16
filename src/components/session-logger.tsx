@@ -1,481 +1,250 @@
 'use client'
 
-import { Check, History, Loader2, Timer, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, Play, Timer } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
-import {
-  discardSession,
-  finishSession,
-  logSet,
-  startSession,
-  type LoggedSet,
-} from '@/lib/session-actions'
-import {
-  formatTarget,
-  normaliseExerciseName,
-  type LastPerformed,
-  type LastPerformedMap,
-  type RoutineExercise,
-} from '@/lib/queries'
-import { SerialWriteQueue } from '@/lib/serial-write-queue'
-import { formatDateLabel } from '@/lib/week'
+import { useEffect, useRef, useState } from 'react'
+import { completeSet, finishSession, startSession, type LoggedSet } from '@/lib/session-actions'
+import { formatTarget, normaliseExerciseName, type LastPerformedMap, type RoutineExercise } from '@/lib/queries'
+import { formatSetElapsed, inferMovementType, progressionIncrement, startingWorkoutWeight, type MovementType, type WorkoutExercise } from '@/lib/workout-flow'
 
-// Guided Set uses browser-only audio, speech, and wake-lock APIs. It is only
-// needed after a user chooses a set, so keeping it out of the initial session
-// chunk makes opening an ordinary workout lighter.
-const GuidedSet = dynamic(
-  () => import('@/components/guided-set').then((module) => module.GuidedSet),
-  { ssr: false },
-)
+const GuidedSet = dynamic(() => import('@/components/guided-set').then((module) => module.GuidedSet), { ssr: false })
 
-type SetRow = {
-  key: string
-  routine_exercise_id: string
-  exercise_name: string
-  order_index: number
-  set_index: number
-  isTime: boolean
-  /** Reps, or seconds held — whichever the exercise is measured in. */
-  amount: string
-  weight: string
-  completed: boolean
-}
+type SetRow = { key: string; exerciseId: string; setIndex: number; amount: string; weight: string; completed: boolean }
+type Screen = { step: 'list' } | { step: 'prepare' | 'running' | 'result'; key: string }
 
-/**
- * What to put in the weight box before the user touches it. What they lifted
- * last time beats the generator's guess, which never learns; sets with no
- * counterpart last time inherit that session's heaviest set.
- */
-function startingWeight(
-  exercise: RoutineExercise,
-  setIndex: number,
-  last: LastPerformed | undefined,
-): string {
-  if (last) {
-    const previous = last.weights[setIndex] ?? last.lastWeight
-    if (previous != null) return String(previous)
-  }
-  return exercise.target_weight != null ? String(exercise.target_weight) : ''
-}
-
-/** "185 lbs · Fri, Aug 7", or a range when the sets were not all the same. */
-function lastTimeLabel(
-  last: LastPerformed | undefined,
-  unit: string,
-): string | null {
-  if (!last) return null
-  const values = Object.values(last.weights)
-  if (values.length === 0) return null
-  const low = Math.min(...values)
-  const high = Math.max(...values)
-  const weight = low === high ? `${low}` : `${low}–${high}`
-  return `${weight} ${unit} · ${formatDateLabel(last.performed_on)}`
-}
-
-function buildRows(
-  exercises: RoutineExercise[],
-  lastPerformed: LastPerformedMap,
-): SetRow[] {
+function buildRows(exercises: WorkoutExercise[], history: LastPerformedMap, saved: LoggedSet[]): SetRow[] {
   return exercises.flatMap((exercise) => {
-    const isTime = exercise.metric === 'time'
-    const last = lastPerformed[normaliseExerciseName(exercise.exercise_name)]
-    return Array.from({ length: exercise.target_sets }, (_, i) => ({
-      key: `${exercise.id}-${i}`,
-      routine_exercise_id: exercise.id,
-      exercise_name: exercise.exercise_name,
-      order_index: exercise.order_index,
-      set_index: i,
-      isTime,
-      amount: String(isTime ? (exercise.target_seconds ?? 45) : exercise.target_reps),
-      weight: startingWeight(exercise, i, last),
-      completed: false,
-    }))
+    const last = history[normaliseExerciseName(exercise.exercise_name)]
+    return Array.from({ length: exercise.target_sets }, (_, setIndex) => {
+      const stored = saved.find((set) => set.exercise_name === exercise.exercise_name && set.order_index === exercise.order_index && set.set_index === setIndex)
+      return {
+        key: `${exercise.id}-${setIndex}`, exerciseId: exercise.id, setIndex,
+        amount: String(stored ? (exercise.metric === 'time' ? stored.seconds : stored.reps) ?? '' : exercise.metric === 'time' ? exercise.target_seconds ?? 45 : exercise.target_reps),
+        weight: stored ? (stored.weight == null ? '' : String(stored.weight)) : startingWorkoutWeight(exercise.target_weight, last?.weights[setIndex] ?? last?.lastWeight),
+        completed: stored?.completed ?? false,
+      }
+    })
   })
 }
 
-function loggedSetKey(set: Pick<LoggedSet, 'exercise_name' | 'order_index' | 'set_index'>) {
-  return `${set.exercise_name}#${set.order_index}#${set.set_index}`
+function SetTimer({ onFinish, onTempo, canUseTempo }: {
+  onFinish: (elapsedMs: number) => void; onTempo: () => void; canUseTempo: boolean
+}) {
+  const startedAt = useRef<number | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    startedAt.current ??= performance.now()
+    const timer = window.setInterval(() => setElapsed(performance.now() - startedAt.current!), 200)
+    return () => window.clearInterval(timer)
+  }, [])
+  return (
+    <div className="py-8 text-center sm:py-14">
+      <p className="text-sm font-medium text-muted">Set in progress</p>
+      <p className="my-8 text-7xl font-bold tabular-nums sm:text-8xl" role="timer" aria-label="Time spent on this set">{formatSetElapsed(elapsed)}</p>
+      <div className="mx-auto flex max-w-sm flex-col gap-3">
+        {canUseTempo && <button type="button" className="btn-ghost min-h-14 border border-edge" onClick={onTempo}><Timer className="size-5" />Use tempo</button>}
+        <button type="button" className="btn-primary min-h-14" onClick={() => onFinish(performance.now() - (startedAt.current ?? performance.now()))}><Check className="size-5" />Finish set</button>
+      </div>
+    </div>
+  )
 }
 
-function rowStorageKey(row: Pick<SetRow, 'exercise_name' | 'order_index' | 'set_index'>) {
-  return `${row.exercise_name}#${row.order_index}#${row.set_index}`
-}
-
-/** Overlays already-saved sets onto the target-derived rows. */
-function hydrate(rows: SetRow[], saved: LoggedSet[]): SetRow[] {
-  if (saved.length === 0) return rows
-  const byKey = new Map(saved.map((s) => [loggedSetKey(s), s] as const))
-  return rows.map((row) => {
-    const match = byKey.get(rowStorageKey(row))
-    if (!match) return row
-    const saved = row.isTime ? match.seconds : match.reps
-    return {
-      ...row,
-      amount: saved != null ? String(saved) : row.amount,
-      weight: match.weight != null ? String(match.weight) : row.weight,
-      completed: match.completed,
-    }
-  })
-}
-
-function toNumber(value: string): number | null {
-  const trimmed = value.trim()
-  if (trimmed === '') return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-export function SessionLogger({
-  routineDayId,
-  dayName,
-  exercises,
-  unit,
-  lastPerformed,
-}: {
-  routineDayId: string
-  dayName: string
-  exercises: RoutineExercise[]
-  unit: string
-  lastPerformed: LastPerformedMap
+export function SessionLogger({ routineDayId, dayName, exercises: planExercises, unit: profileUnit, lastPerformed }: {
+  routineDayId: string; dayName: string; exercises: RoutineExercise[]; unit: string; lastPerformed: LastPerformedMap
 }) {
   const router = useRouter()
-  const [rows, setRows] = useState<SetRow[]>(() =>
-    buildRows(exercises, lastPerformed),
-  )
+  const [exercises, setExercises] = useState<WorkoutExercise[]>([])
+  const [rows, setRows] = useState<SetRow[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [screen, setScreen] = useState<Screen>({ step: 'list' })
+  const [movementTypes, setMovementTypes] = useState<Record<string, MovementType | null>>({})
   const [error, setError] = useState<string | null>(null)
-  const [guidedRowKey, setGuidedRowKey] = useState<string | null>(null)
-  const [finishing, startFinishing] = useTransition()
-  const started = useRef(false)
-  // Opening the session is a round trip, but the set toggles are live before it
-  // lands. Taps made in that window queue here instead of being dropped, and
-  // flush as soon as there is an id to write them against.
-  const sessionIdRef = useRef<string | null>(null)
-  const pending = useRef(new Map<string, SetRow>())
-  const writeQueue = useRef(new SerialWriteQueue())
-  const failedWrites = useRef(new Map<string, string>())
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [tempoOpen, setTempoOpen] = useState(false)
+  const [actualAmount, setActualAmount] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  // Cover the interval before React paints a disabled save button.
+  const saving = useRef(false)
+  const unit = exercises[0]?.unit ?? profileUnit
 
-  const write = useCallback(async (
-    id: string,
-    row: SetRow,
-  ): Promise<{ error?: string }> => {
-    const amount = toNumber(row.amount)
-    const result = await logSet(id, {
-      exercise_name: row.exercise_name,
-      order_index: row.order_index,
-      set_index: row.set_index,
-      // Only one of these is ever set, which is also what keeps time-based
-      // work out of the reps × weight volume total.
-      reps: row.isTime ? null : amount,
-      seconds: row.isTime ? amount : null,
-      weight: toNumber(row.weight),
-      completed: row.completed,
-    })
-    const key = rowStorageKey(row)
-    if (result.error) {
-      failedWrites.current.set(key, result.error)
-      setError(result.error)
-    } else {
-      failedWrites.current.delete(key)
-    }
-    return result
-  }, [])
-
-  const queueWrite = useCallback((id: string, row: SetRow) => {
-    return writeQueue.current.enqueue(() => write(id, row))
-  }, [write])
-
-  // Open (or resume) the session once, so every later save has an id and a
-  // mid-workout reload restores what was already logged.
   useEffect(() => {
-    if (started.current) return
-    started.current = true
-    startSession(routineDayId).then((result) => {
-      if (result.error) {
-        setError(result.error)
-        return
+    let active = true
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const result = await startSession(routineDayId)
+        if (!active) return
+        if (result.error || !result.sessionId || !result.exercises) {
+          setError(result.error ?? 'Could not open this workout.')
+          return
+        }
+        setSessionId(result.sessionId)
+        setExercises(result.exercises)
+        setRows(buildRows(result.exercises, lastPerformed, result.sets ?? []))
+        setMovementTypes(Object.fromEntries(result.exercises.map((exercise) => [exercise.id, exercise.movement_type ?? inferMovementType(exercise.exercise_name)])))
+      } catch {
+        if (active) setError('Could not open the workout. Check your connection and try again.')
+      } finally {
+        if (active) setLoading(false)
       }
-      if (!result.sessionId) return
-      sessionIdRef.current = result.sessionId
-      setSessionId(result.sessionId)
-
-      // Anything the user already touched wins over the stored copy, so
-      // resuming a session never reverts a tap made while it was loading.
-      const saved = result.sets
-      if (saved && saved.length > 0) {
-        const queued = pending.current
-        setRows((prev) =>
-          hydrate(
-            prev,
-            saved.filter(
-              (s) => !queued.has(loggedSetKey(s)),
-            ),
-          ),
-        )
-      }
-
-      const queued = [...pending.current.values()]
-      pending.current.clear()
-      for (const row of queued) void queueWrite(result.sessionId, row)
-    })
-  }, [queueWrite, routineDayId])
-
-  function persist(row: SetRow): Promise<{ error?: string }> {
-    const id = sessionIdRef.current
-    if (!id) {
-      pending.current.set(rowStorageKey(row), row)
-      return Promise.resolve({ error: 'The workout session is still starting.' })
     }
-    return queueWrite(id, row)
+    void load()
+    return () => { active = false }
+  }, [routineDayId, lastPerformed, loadAttempt])
+
+  const row = screen.step === 'list' ? null : rows.find((entry) => entry.key === screen.key) ?? null
+  const exercise = row ? exercises.find((entry) => entry.id === row.exerciseId) ?? null : null
+  const completedCount = rows.filter((entry) => entry.completed).length
+
+  function patchRow(patch: Partial<SetRow>) {
+    if (row) setRows((previous) => previous.map((entry) => entry.key === row.key ? { ...entry, ...patch } : entry))
   }
 
-  // The write stays outside the state updater: React can invoke updaters twice
-  // in StrictMode, which would double-save every set.
-  function update(key: string, patch: Partial<SetRow>, save: boolean) {
-    const current = rows.find((row) => row.key === key)
-    if (!current) return
-    const updated = { ...current, ...patch }
-    setRows((prev) => prev.map((row) => (row.key === key ? updated : row)))
-    if (save) void persist(updated)
+  function openExercise(selected: WorkoutExercise) {
+    const next = rows.find((entry) => entry.exerciseId === selected.id && !entry.completed)
+    if (next) { setError(null); setScreen({ step: 'prepare', key: next.key }) }
   }
 
-  const guidedRow = rows.find((row) => row.key === guidedRowKey) ?? null
-  const guidedExercise = guidedRow
-    ? exercises.find((exercise) => exercise.id === guidedRow.routine_exercise_id) ?? null
-    : null
-
-  async function saveGuidedSet(completedReps: number) {
-    if (!guidedRow) throw new Error('That set is no longer available.')
-    const updated = {
-      ...guidedRow,
-      amount: String(completedReps),
-      completed: true,
-    }
-    setRows((previous) =>
-      previous.map((row) => (row.key === updated.key ? updated : row)),
-    )
-    const result = await persist(updated)
-    if (result.error) throw new Error(result.error)
+  function finishSet(elapsedMs?: number, tempoReps?: number) {
+    if (!row || !exercise) return
+    setTempoOpen(false)
+    setActualAmount(exercise.metric === 'time' ? String(Math.min(3600, Math.floor((elapsedMs ?? 0) / 1000))) : tempoReps == null ? '' : String(tempoReps))
+    setError(null)
+    setScreen({ step: 'result', key: row.key })
   }
 
-  const completedCount = rows.filter((r) => r.completed).length
-  // Time-based sets are excluded: seconds × weight is not the same quantity as
-  // reps × weight, and adding them together would make the total meaningless.
-  const volume = rows
-    .filter((r) => r.completed && !r.isTime)
-    .reduce((sum, r) => sum + (toNumber(r.amount) ?? 0) * (toNumber(r.weight) ?? 0), 0)
-  const heldSeconds = rows
-    .filter((r) => r.completed && r.isTime)
-    .reduce((sum, r) => sum + (toNumber(r.amount) ?? 0), 0)
+  function validateWeight() {
+    const weight = row?.weight.trim() ? Number(row.weight) : null
+    if (weight !== null && (!Number.isFinite(weight) || weight < 0 || weight > 5000)) return 'Enter a weight between 0 and 5000, or leave it blank for bodyweight.'
+    if (exercise?.metric === 'reps' && weight !== null && weight > 0 && !movementTypes[exercise.id]) return 'Choose compound or isolation before starting.'
+    return null
+  }
 
-  function finish() {
-    if (!sessionId) return
-    startFinishing(async () => {
-      await writeQueue.current.flush()
-      if (failedWrites.current.size > 0) {
-        setError('Resolve the set save error before finishing this workout.')
-        return
-      }
-      const res = await finishSession(sessionId)
-      if (res.error) {
-        setError(res.error)
-        return
-      }
+  async function saveResult() {
+    if (!row || !exercise || saving.current) return
+    const amount = actualAmount.trim() === '' ? NaN : Number(actualAmount)
+    const maximum = exercise.metric === 'time' ? 3600 : 1000
+    if (!Number.isInteger(amount) || amount < 0 || amount > maximum) { setError(`Enter a whole number between 0 and ${maximum}.`); return }
+    const weightError = validateWeight()
+    if (weightError) { setError(weightError); return }
+    saving.current = true
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await completeSet(exercise.id, {
+        exercise_name: exercise.exercise_name, order_index: exercise.order_index, set_index: row.setIndex,
+        reps: exercise.metric === 'reps' ? amount : null,
+        seconds: exercise.metric === 'time' ? amount : null,
+        weight: row.weight.trim() === '' ? null : Number(row.weight), completed: true,
+      }, movementTypes[exercise.id] ?? null)
+      if (result.error) { setError(result.error); return }
+      setRows((previous) => previous.map((entry) => entry.key === row.key
+        ? { ...entry, amount: String(amount), completed: true }
+        : entry.exerciseId === exercise.id && !entry.completed ? { ...entry, weight: row.weight } : entry))
+      if (result.nextWeight != null) setExercises((previous) => previous.map((entry) => entry.id === exercise.id ? { ...entry, next_weight: result.nextWeight! } : entry))
+      const next = rows.find((entry) => entry.exerciseId === exercise.id && entry.key !== row.key && !entry.completed)
+      setScreen(next ? { step: 'prepare', key: next.key } : { step: 'list' })
+    } catch {
+      setError('Could not save the set. Your result is still here; try saving again.')
+    } finally { saving.current = false; setBusy(false) }
+  }
+
+  async function finishWorkout() {
+    if (!sessionId || saving.current) return
+    saving.current = true
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await finishSession(sessionId)
+      if (result.error) { setError(result.error); return }
       router.push('/dashboard')
       router.refresh()
-    })
+    } catch { setError('Could not finish the workout. Please try again.') }
+    finally { saving.current = false; setBusy(false) }
   }
 
-  function discard() {
-    if (!sessionId) {
-      router.push('/dashboard')
-      return
-    }
-    startFinishing(async () => {
-      await discardSession(sessionId)
-      router.push('/dashboard')
-      router.refresh()
-    })
-  }
-
-  // Group rows back into their exercises for rendering.
-  const grouped = exercises.map((exercise) => ({
-    exercise,
-    isTime: exercise.metric === 'time',
-    lastLabel: lastTimeLabel(
-      lastPerformed[normaliseExerciseName(exercise.exercise_name)],
-      unit,
-    ),
-    rows: rows.filter((r) => r.routine_exercise_id === exercise.id),
-  }))
+  if (loading) return <div className="card flex items-center gap-3" role="status"><Loader2 className="size-5 animate-spin" />Opening your {planExercises.length} exercises…</div>
 
   return (
-    <div className="space-y-5 pb-28">
-      {error && (
-        <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-          {error}
-        </p>
-      )}
-
-      {grouped.map(({ exercise, isTime, lastLabel, rows: exerciseRows }) => (
-        <section key={exercise.id} className="card">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-semibold">{exercise.exercise_name}</h2>
-            <span className="shrink-0 text-xs text-muted">
-              target {formatTarget(exercise)}
-            </span>
-          </div>
-          {exercise.notes && (
-            <p className="mt-1 text-sm text-muted">{exercise.notes}</p>
-          )}
-          {lastLabel && (
-            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-2 py-1 text-xs text-muted">
-              <History className="size-3" />
-              Last time {lastLabel}
-            </p>
-          )}
-
-          <div className="mt-4 space-y-2">
-            <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem_2.5rem] gap-2 px-1 text-xs font-medium text-muted uppercase">
-              <span>Set</span>
-              <span>{isTime ? 'Seconds' : 'Reps'}</span>
-              <span>Weight ({unit})</span>
-              <span className="sr-only">Guided set</span>
-              <span className="text-right">Done</span>
-            </div>
-
-            {exerciseRows.map((row) => (
-              <div
-                key={row.key}
-                className={`grid grid-cols-[2rem_1fr_1fr_2.5rem_2.5rem] items-center gap-2 rounded-xl px-1 py-1 transition ${
-                  row.completed ? 'bg-accent/5' : ''
-                }`}
-              >
-                <span className="text-sm tabular-nums text-muted">
-                  {row.set_index + 1}
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  aria-label={`${exercise.exercise_name} set ${row.set_index + 1} ${
-                    isTime ? 'seconds' : 'reps'
-                  }`}
-                  value={row.amount}
-                  onChange={(e) => update(row.key, { amount: e.target.value }, false)}
-                  onBlur={() => {
-                    const current = rows.find((r) => r.key === row.key)
-                    if (current) persist(current)
-                  }}
-                  className="input no-spin px-2.5 py-2 text-center"
-                />
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.5"
-                  placeholder="—"
-                  aria-label={`${exercise.exercise_name} set ${
-                    row.set_index + 1
-                  } weight`}
-                  value={row.weight}
-                  onChange={(e) =>
-                    update(row.key, { weight: e.target.value }, false)
-                  }
-                  onBlur={() => {
-                    const current = rows.find((r) => r.key === row.key)
-                    if (current) persist(current)
-                  }}
-                  className="input no-spin px-2.5 py-2 text-center"
-                />
-                {isTime ? (
-                  <span />
-                ) : (
-                  <button
-                    type="button"
-                    aria-label={`Start guided set for ${exercise.exercise_name} set ${
-                      row.set_index + 1
-                    }`}
-                    title="Guided set"
-                    disabled={!sessionId}
-                    onClick={() => {
-                      setError(null)
-                      setGuidedRowKey(row.key)
-                    }}
-                    className="flex size-9 items-center justify-center justify-self-end rounded-lg border border-edge bg-surface-2 text-accent transition hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Timer className="size-4" />
+    <div className={`space-y-5 ${screen.step === 'list' ? 'pb-32' : 'pb-8'}`}>
+      {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
+      {!sessionId ? <button className="btn-primary" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Retry opening workout</button> : screen.step === 'list' ? (
+        <>
+          <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Your exercises</h2><span className="text-sm text-muted">{completedCount} / {rows.length} sets done</span></div>
+          {exercises.map((entry) => {
+            const done = rows.filter((item) => item.exerciseId === entry.id && item.completed).length
+            const complete = done === entry.target_sets
+            return (
+              <section key={entry.id} className="card">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0"><h3 className="text-lg font-semibold">{entry.exercise_name}</h3><p className="mt-1 text-sm text-muted">{formatTarget(entry)} · {done} / {entry.target_sets} sets done</p></div>
+                  <button type="button" className={complete ? 'btn-ghost shrink-0' : 'btn-primary shrink-0'} disabled={complete || busy} onClick={() => openExercise(entry)} aria-label={`${complete ? 'Completed' : 'Start'} ${entry.exercise_name}`}>
+                    {complete ? <Check className="size-4" /> : <Play className="size-4" />}{complete ? 'Done' : 'Start'}
                   </button>
-                )}
-                <button
-                  type="button"
-                  aria-label={`Mark set ${row.set_index + 1} complete`}
-                  aria-pressed={row.completed}
-                  onClick={() =>
-                    update(row.key, { completed: !row.completed }, true)
-                  }
-                  className={`flex size-9 items-center justify-center justify-self-end rounded-lg border transition ${
-                    row.completed
-                      ? 'border-accent bg-accent text-slate-950'
-                      : 'border-edge bg-surface-2 text-muted hover:border-accent/50'
-                  }`}
-                >
-                  <Check className="size-4" />
-                </button>
+                </div>
+                {entry.next_weight != null && <p className="mt-3 text-sm font-medium text-accent" role="status">All rep targets met. Your plan is now {entry.next_weight} {unit} for next time.</p>}
+                {complete && entry.next_weight == null && <p className="mt-3 text-sm text-muted">Exercise complete. Plan weight unchanged.</p>}
+              </section>
+            )
+          })}
+          <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 border-t border-edge bg-surface px-4 py-3 sm:bottom-0 sm:left-[72px]">
+            <div className="mx-auto max-w-3xl">
+              <button type="button" className="btn-primary min-h-12 w-full" disabled={busy || completedCount === 0} onClick={() => void finishWorkout()}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}Finish workout</button>
+              {completedCount > 0 && completedCount < rows.length && <p className="mt-2 text-center text-xs text-muted">You can finish early. Only completed sets will be recorded in history.</p>}
+            </div>
+          </div>
+        </>
+      ) : row && exercise ? (
+        <section className="card">
+          {screen.step === 'prepare' && <button type="button" className="mb-5 inline-flex items-center gap-2 text-sm text-muted hover:text-foreground" onClick={() => { setError(null); setScreen({ step: 'list' }) }}><ArrowLeft className="size-4" />All exercises</button>}
+          <p className="text-sm font-medium text-accent">{dayName} · Set {row.setIndex + 1} of {exercise.target_sets}</p>
+          <h2 className="mt-2 text-2xl font-bold">{exercise.exercise_name}</h2>
+          {screen.step === 'prepare' ? (
+            <div className="mt-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4 rounded-lg bg-surface-2 p-5">
+                <div><p className="text-sm text-muted">Target {exercise.metric === 'time' ? 'seconds' : 'reps'}</p><p className="mt-2 text-4xl font-bold tabular-nums">{exercise.metric === 'time' ? exercise.target_seconds : exercise.target_reps}</p></div>
+                <label className="text-sm text-muted" htmlFor="set-weight">Weight ({unit})<input id="set-weight" type="number" inputMode="decimal" min="0" max="5000" step="any" placeholder="Bodyweight" className="input mt-2" value={row.weight} onChange={(event) => patchRow({ weight: event.target.value })} /></label>
               </div>
-            ))}
-          </div>
+              {exercise.notes && <p className="text-sm text-muted">{exercise.notes}</p>}
+              {exercise.metric === 'reps' && <div>
+                <label className="text-sm font-medium" htmlFor="movement-type">Exercise type</label>
+                <select id="movement-type" className="input mt-2" value={movementTypes[exercise.id] ?? ''} onChange={(event) => setMovementTypes((previous) => ({ ...previous, [exercise.id]: event.target.value as MovementType || null }))}>
+                  <option value="">Choose type</option><option value="compound">Compound · multiple joints</option><option value="isolation">Isolation · one joint</option>
+                </select>
+                <p className="mt-2 text-xs leading-5 text-muted">{movementTypes[exercise.id] ? `Meet your rep target on every set to add ${progressionIncrement(movementTypes[exercise.id]!, unit)} ${unit} for next time.` : 'Choose the type for automatic weight increases.'} Bodyweight sets keep the same plan weight.</p>
+              </div>}
+              {row.setIndex > 0 && exercise.rest_seconds != null && <p className="text-sm text-muted">Suggested rest between sets: {exercise.rest_seconds} seconds. Start when you’re ready.</p>}
+              <button type="button" className="btn-primary min-h-14 w-full" onClick={() => {
+                const weightError = validateWeight()
+                if (weightError) { setError(weightError); return }
+                setError(null); setScreen({ step: 'running', key: row.key })
+              }}><Play className="size-5" />Start set</button>
+            </div>
+          ) : screen.step === 'running' ? <>
+            <p className="mt-2 text-sm text-muted">Target {exercise.metric === 'time' ? `${exercise.target_seconds}s` : `${exercise.target_reps} reps`} · {row.weight ? `${row.weight} ${unit}` : 'Bodyweight'}</p>
+            <SetTimer key={row.key} canUseTempo={exercise.metric === 'reps'} onFinish={(elapsed) => finishSet(elapsed)} onTempo={() => setTempoOpen(true)} />
+          </> : (
+            <form className="mt-8 space-y-6" onSubmit={(event) => { event.preventDefault(); void saveResult() }}>
+              <div>
+                <label className="text-lg font-semibold" htmlFor="actual-amount">{exercise.metric === 'time' ? 'How many seconds did you do?' : 'How many reps did you actually do?'}</label>
+                <p className="mt-2 text-sm text-muted">Target: {exercise.metric === 'time' ? `${exercise.target_seconds} seconds` : `${exercise.target_reps} reps`}. Confirm your result before saving.</p>
+                <input key={row.key} autoFocus id="actual-amount" type="number" inputMode="numeric" min="0" max={exercise.metric === 'time' ? 3600 : 1000} step="1" required className="input mt-4 py-4 text-center text-3xl" value={actualAmount} disabled={busy} onChange={(event) => setActualAmount(event.target.value)} />
+              </div>
+              <label className="block text-sm font-medium" htmlFor="actual-weight">Weight actually used ({unit})<input id="actual-weight" type="number" inputMode="decimal" min="0" max="5000" step="any" placeholder="Bodyweight" className="input mt-2" value={row.weight} disabled={busy} onChange={(event) => patchRow({ weight: event.target.value })} /></label>
+              {exercise.metric === 'reps' && <label className="block text-sm font-medium" htmlFor="result-movement-type">Exercise type
+                <select id="result-movement-type" className="input mt-2" disabled={busy} value={movementTypes[exercise.id] ?? ''} onChange={(event) => setMovementTypes((previous) => ({ ...previous, [exercise.id]: event.target.value as MovementType || null }))}>
+                  <option value="">Choose type</option><option value="compound">Compound · multiple joints</option><option value="isolation">Isolation · one joint</option>
+                </select>
+              </label>}
+              <button type="submit" className="btn-primary min-h-14 w-full" disabled={busy}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}Save set</button>
+            </form>
+          )}
         </section>
-      ))}
-
-      {/* Sticky action bar, above the mobile nav. */}
-      <div className="fixed inset-x-0 bottom-20 z-10 border-t border-edge bg-surface/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:left-[72px]">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
-          <div className="text-sm">
-            <p className="font-medium">
-              {completedCount} / {rows.length} sets
-            </p>
-            <p className="text-muted tabular-nums">
-              {Math.round(volume).toLocaleString()} {unit} volume
-              {heldSeconds > 0 && ` · ${heldSeconds}s held`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={discard}
-              disabled={finishing}
-              className="btn-ghost"
-              title={`Discard ${dayName}`}
-            >
-              <Trash2 className="size-4" />
-              <span className="hidden sm:inline">Discard</span>
-            </button>
-            <button
-              onClick={finish}
-              disabled={finishing || !sessionId || completedCount === 0}
-              className="btn-primary"
-            >
-              {finishing ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Check className="size-4" />
-              )}
-              Finish
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {guidedRow && guidedExercise && (
-        <GuidedSet
-          exerciseName={guidedRow.exercise_name}
-          setNumber={guidedRow.set_index + 1}
-          targetReps={guidedExercise.target_reps}
-          weight={guidedRow.weight}
-          unit={unit}
-          onSave={saveGuidedSet}
-          onClose={() => setGuidedRowKey(null)}
-        />
-      )}
+      ) : null}
+      {tempoOpen && row && exercise && <GuidedSet exerciseName={exercise.exercise_name} setNumber={row.setIndex + 1} targetReps={exercise.target_reps} weight={row.weight} unit={unit} onComplete={(reps) => finishSet(undefined, reps)} onClose={() => setTempoOpen(false)} />}
     </div>
   )
 }

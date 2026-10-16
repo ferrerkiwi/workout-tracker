@@ -1,21 +1,19 @@
 import {
   CalendarDays,
   ChevronRight,
-  Flame,
   Play,
   Sparkles,
-  TrendingUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { DAY_NAMES } from '@/lib/constants'
 import {
+  getActiveRoutine,
   getProfile,
   getStreakSource,
   getThisWeekSessions,
 } from '@/lib/queries'
-import { ensureCurrentRoutine } from '@/lib/routine-initialization'
-import { buildPlanLookup, computeStreak } from '@/lib/streak'
+import { buildRecurringPlanLookup, computeStreak } from '@/lib/streak'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import {
   addDays,
@@ -35,11 +33,9 @@ export default async function DashboardPage() {
   const now = today()
   const weekStart = startOfWeek(now)
 
-  // Initialize before the streak query so this render sees the new week's
-  // rest/training days as well as the routine shown below.
-  const routine = await ensureCurrentRoutine(supabase, user.id)
-  const [profile, streakSource, weekSessions] = await Promise.all([
+  const [profile, routine, streakSource, weekSessions] = await Promise.all([
     getProfile(supabase, user.id),
+    getActiveRoutine(supabase, user.id),
     getStreakSource(supabase, user.id),
     getThisWeekSessions(supabase, user.id),
   ])
@@ -48,7 +44,7 @@ export default async function DashboardPage() {
 
   const streak = computeStreak({
     completedDates: streakSource.completedDates,
-    plan: buildPlanLookup(streakSource.routines),
+    plan: buildRecurringPlanLookup(routine),
   })
 
   const weekVolume = weekSessions.reduce((sum, s) => sum + Number(s.total_volume), 0)
@@ -77,7 +73,7 @@ export default async function DashboardPage() {
     <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-8 sm:py-12">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold">
             {profile?.display_name ? `Hi ${profile.display_name}` : 'Overview'}
           </h1>
           <p className="mt-1 text-muted">
@@ -95,58 +91,18 @@ export default async function DashboardPage() {
         </Link>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={<Flame className="size-4" />}
-          label="Current streak"
-          value={`${streak} ${streak === 1 ? 'day' : 'days'}`}
-          hint="Rest days count. Missing a scheduled workout resets it."
-        />
-        <StatCard
-          icon={<TrendingUp className="size-4" />}
-          label="Volume this week"
-          value={formatVolume(weekVolume, unit)}
-          hint={`${weekSessions.length} workout${
-            weekSessions.length === 1 ? '' : 's'
-          } logged`}
-        />
-        <StatCard
-          icon={<Play className="size-4" />}
-          label="Next workout"
-          value={
-            todayWorkout
-              ? todayWorkout.name
-              : upcoming
-                ? upcoming.name
-                : restToday
-                  ? 'Rest day'
-                  : '—'
-          }
-          hint={
-            todayWorkout
-              ? `Today · ${todayWorkout.routine_exercises.length} exercises`
-              : upcoming && upcomingDate
-                ? `${relativeDayLabel(upcomingDate)} · ${
-                    upcoming.routine_exercises.length
-                  } exercises`
-                : routine
-                  ? 'Nothing left this week'
-                  : 'No routine yet'
-          }
-        />
-      </div>
-
-      <section className="mt-8">
+      <section>
         {!routine ? (
           <EmptyState />
         ) : todayWorkout ? (
-          <div className="card flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-lg border border-edge border-l-2 border-l-accent bg-surface px-5 py-5 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-5">
             <div>
-              <p className="text-sm text-muted">Today · {DAY_NAMES[todayIndex]}</p>
-              <h2 className="mt-0.5 text-xl font-semibold">
+              <p className="text-sm font-medium text-accent">Today · {DAY_NAMES[todayIndex]}</p>
+              <h2 className="mt-1 text-2xl font-semibold">
                 {todayWorkout.name}
               </h2>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
                 {todayWorkout.routine_exercises
                   .slice(0, 4)
                   .map((e) => e.exercise_name)
@@ -155,10 +111,11 @@ export default async function DashboardPage() {
                   ` · +${todayWorkout.routine_exercises.length - 4} more`}
               </p>
             </div>
-            <Link href={`/session/${todayWorkout.id}`} className="btn-primary">
+            <Link href={`/session/${todayWorkout.id}`} className="btn-primary min-h-11 shrink-0">
               <Play className="size-4" />
               Start workout
             </Link>
+            </div>
           </div>
         ) : (
           <div className="card">
@@ -186,7 +143,7 @@ export default async function DashboardPage() {
             {upcoming && upcomingDate && (
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-edge pt-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted uppercase tracking-wide">
+                  <p className="text-xs font-medium text-muted">
                     Up next · {relativeDayLabel(upcomingDate)}
                   </p>
                   <p className="mt-0.5 truncate font-medium">{upcoming.name}</p>
@@ -202,16 +159,33 @@ export default async function DashboardPage() {
         )}
       </section>
 
+      <section className="mt-8 border-y border-edge py-5">
+        <div className="grid gap-5 sm:grid-cols-2 sm:gap-8">
+          <StatCard
+            label="Current streak"
+            value={`${streak} ${streak === 1 ? 'day' : 'days'}`}
+            hint="Rest days count. Missing a scheduled workout resets it."
+          />
+          <StatCard
+            label="Volume this week"
+            value={formatVolume(weekVolume, unit)}
+            hint={`${weekSessions.length} workout${
+              weekSessions.length === 1 ? '' : 's'
+            } logged`}
+          />
+        </div>
+      </section>
+
       {weekSessions.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold text-muted uppercase tracking-wide">
+          <h2 className="mb-3 text-sm font-semibold text-muted">
             This week
           </h2>
           <ul className="space-y-2">
             {weekSessions.map((session) => (
               <li
                 key={session.id}
-                className="flex items-center justify-between rounded-xl border border-edge bg-surface px-4 py-3"
+                className="flex items-center justify-between border-b border-edge py-3 last:border-b-0"
               >
                 <div>
                   <p className="font-medium">{session.name ?? 'Workout'}</p>
@@ -235,23 +209,18 @@ export default async function DashboardPage() {
 }
 
 function StatCard({
-  icon,
   label,
   value,
   hint,
 }: {
-  icon: React.ReactNode
   label: string
   value: string
   hint: string
 }) {
   return (
-    <div className="card">
-      <div className="flex items-center gap-2 text-muted">
-        {icon}
-        <span className="text-sm font-medium">{label}</span>
-      </div>
-      <p className="mt-2 truncate text-2xl font-bold tracking-tight">{value}</p>
+    <div>
+      <p className="text-sm font-medium text-muted">{label}</p>
+      <p className="mt-1 truncate text-2xl font-semibold tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-muted">{hint}</p>
     </div>
   )
@@ -260,17 +229,17 @@ function StatCard({
 function EmptyState() {
   return (
     <div className="card flex flex-col items-center py-10 text-center">
-      <span className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-accent/15">
+      <span className="mb-4 flex size-12 items-center justify-center rounded-lg bg-accent/15">
         <Sparkles className="size-6 text-accent" />
       </span>
-      <h2 className="text-lg font-semibold">No plan for this week yet</h2>
+      <h2 className="text-lg font-semibold">No routine yet</h2>
       <p className="mt-1 max-w-sm text-sm text-muted">
         Generate one from your preferences, or build your own. Either way it
         shows up here with your next workout ready to start.
       </p>
       <Link href="/plan" className="btn-primary mt-5">
         <Sparkles className="size-4" />
-        Set up this week
+        Set up your routine
       </Link>
     </div>
   )

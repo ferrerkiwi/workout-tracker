@@ -1,7 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import type { TablesUpdate } from '@/lib/database.types'
 import type { Client, RoutineExercise } from '@/lib/queries'
-import { startOfWeek, toDateKey, today } from '@/lib/week'
 
 export type ActionResult<T = undefined> = { error?: string; data?: T }
 export type Metric = 'reps' | 'time'
@@ -94,7 +93,7 @@ export async function updateRoutineExercise(
   const exercise = await getRoutineExercise(supabase, exerciseId)
   if (!exercise) return { error: 'Exercise not found or is read-only.' }
   if (!(await getRoutineDay(supabase, exercise.routine_day_id))) {
-    return { error: 'Past weekly plans are read-only.' }
+    return { error: 'Exercise no longer belongs to your active routine.' }
   }
 
   const clean = cleanExercisePatch(patch)
@@ -129,7 +128,7 @@ export async function deleteRoutineExercise(
   const exercise = await getRoutineExercise(supabase, exerciseId)
   if (!exercise) return { error: 'Exercise not found or is read-only.' }
   if (!(await getRoutineDay(supabase, exercise.routine_day_id))) {
-    return { error: 'Past weekly plans are read-only.' }
+    return { error: 'Exercise no longer belongs to your active routine.' }
   }
 
   const { data, error } = await supabase
@@ -160,7 +159,7 @@ export async function moveRoutineExercise(
   if (error) return { error: error.message }
   if (!current) return { error: 'Exercise not found.' }
   if (!(await getRoutineDay(supabase, current.routine_day_id))) {
-    return { error: 'Past weekly plans are read-only.' }
+    return { error: 'Exercise no longer belongs to your active routine.' }
   }
 
   const exercises = await getDayExercises(supabase, current.routine_day_id)
@@ -264,12 +263,11 @@ function cleanExercisePatch(
 }
 
 async function getRoutineDay(supabase: Client, routineDayId: string) {
-  const currentWeekStart = toDateKey(startOfWeek(today()))
   const { data } = await supabase
     .from('routine_days')
-    .select('id, is_rest_day, routines!inner(week_start_date)')
+    .select('id, is_rest_day, routines!inner(is_active)')
     .eq('id', routineDayId)
-    .eq('routines.week_start_date', currentWeekStart)
+    .eq('routines.is_active', true)
     .maybeSingle()
   return data
 }

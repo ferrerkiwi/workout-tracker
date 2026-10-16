@@ -9,17 +9,62 @@ import {
 import { safeInternalPath } from '../src/lib/auth-redirect.ts'
 import { SerialWriteQueue } from '../src/lib/serial-write-queue.ts'
 import { validateLoggedSet } from '../src/lib/session-validation.ts'
-import { normaliseWeekStartParam } from '../src/lib/week.ts'
+import { DEMO_COACH_REQUEST_LIMIT, isAnonymousUser } from '../src/lib/demo.ts'
+import { isScheduledLaterThisWeek } from '../src/lib/week.ts'
+import {
+  formatSetElapsed,
+  inferMovementType,
+  progressionIncrement,
+  startingWorkoutWeight,
+} from '../src/lib/workout-flow.ts'
 
-test('week URL values accept real dates and normalize to their Monday', () => {
-  assert.equal(normaliseWeekStartParam('2026-09-07'), '2026-09-07')
-  assert.equal(normaliseWeekStartParam('2026-09-10'), '2026-09-07')
-  assert.equal(normaliseWeekStartParam('2027-01-01'), '2026-12-28')
-  assert.equal(normaliseWeekStartParam('2026-02-29'), null)
-  assert.equal(normaliseWeekStartParam('09-07-2026'), null)
-  assert.equal(normaliseWeekStartParam(['2026-09-07']), null)
+test('common exercise types are recognized and unknown names require a choice', () => {
+  for (const name of ['Barbell bench press', 'Romanian deadlift', 'Dumbbell row', 'Pull-ups', 'Bulgarian split squat']) {
+    assert.equal(inferMovementType(name), 'compound', name)
+  }
+  for (const name of ['Biceps curl', 'Dumbbell fly', 'Lateral raise', 'Leg extension', 'Triceps pushdown']) {
+    assert.equal(inferMovementType(name), 'isolation', name)
+  }
+  assert.equal(inferMovementType('My custom exercise'), null)
+  assert.equal(inferMovementType('Plank'), null)
 })
 
+test('progression uses the requested pound increases and converts kilogram plans', () => {
+  assert.equal(progressionIncrement('compound', 'lbs'), 10)
+  assert.equal(progressionIncrement('isolation', 'lbs'), 5)
+  assert.equal(progressionIncrement('compound', 'kg'), 4.54)
+  assert.equal(progressionIncrement('isolation', 'kg'), 2.27)
+})
+
+test('earned plan weights take priority over previous workout history', () => {
+  assert.equal(startingWorkoutWeight(145, 135), '145')
+  assert.equal(startingWorkoutWeight(null, 135), '135')
+  assert.equal(startingWorkoutWeight(null, undefined), '')
+  assert.equal(startingWorkoutWeight(0, 135), '0')
+})
+
+test('set timer displays full elapsed minutes without resetting at one hour', () => {
+  assert.equal(formatSetElapsed(999), '00:00')
+  assert.equal(formatSetElapsed(65_123), '01:05')
+  assert.equal(formatSetElapsed(3_600_000), '60:00')
+})
+
+test('recurring routine scheduling does not reset across calendar weeks', () => {
+  const monday = new Date(2026, 8, 7)
+  const wednesday = new Date(2026, 8, 9)
+
+  assert.equal(isScheduledLaterThisWeek(0, monday), false)
+  assert.equal(isScheduledLaterThisWeek(2, monday), true)
+  assert.equal(isScheduledLaterThisWeek(2, wednesday), false)
+  assert.equal(isScheduledLaterThisWeek(6, wednesday), true)
+})
+
+test('demo identity depends on the authoritative Supabase anonymous claim', () => {
+  assert.equal(isAnonymousUser({ is_anonymous: true }), true)
+  assert.equal(isAnonymousUser({ is_anonymous: false }), false)
+  assert.equal(isAnonymousUser(null), false)
+  assert.equal(DEMO_COACH_REQUEST_LIMIT, 3)
+})
 test('Guided Set counts only completed 3-0-1-0 tempo cycles', () => {
   assert.equal(getCompletedReps(0), 0)
   assert.equal(getCompletedReps(3_999), 0)

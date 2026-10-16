@@ -46,9 +46,9 @@ export function PlanFooterActions({
 
   return (
     <section className="card mt-8">
-      <h2 className="font-semibold">Start this week over</h2>
+      <h2 className="font-semibold">Refresh your routine</h2>
       <p className="mt-1 text-sm text-muted">
-        Both options replace this week&rsquo;s plan only. Workouts you have
+        Both options replace your recurring plan. Workouts you have
         already logged stay in your history.
       </p>
 
@@ -60,8 +60,8 @@ export function PlanFooterActions({
 
       {confirming === 'regenerate' ? (
         <Confirm
-          question="Replace this week's plan with a newly generated one?"
-          detail="Every exercise you have added or edited this week will be discarded. The new week is built from these parameters:"
+          question="Replace your recurring routine with a newly generated one?"
+          detail="Every exercise you have added or edited will be discarded. The new routine is built from these parameters:"
           confirmLabel="Yes, generate again"
           onConfirm={doRegenerate}
           onCancel={() => setConfirming(null)}
@@ -69,13 +69,13 @@ export function PlanFooterActions({
           <PreferencesSummary
             facts={facts}
             title="Generating from"
-            className="mt-3 rounded-xl border border-edge bg-surface p-4"
+            className="mt-3 rounded-lg border border-edge bg-surface p-4"
           />
         </Confirm>
       ) : confirming === 'clear' ? (
         <Confirm
-          question="Clear this week's plan?"
-          detail="All seven days become empty rest days for you to build from scratch."
+          question="Clear your recurring routine?"
+          detail="All seven days become empty rest days until you build from scratch."
           confirmLabel="Yes, clear it"
           onConfirm={doClear}
           onCancel={() => setConfirming(null)}
@@ -133,7 +133,7 @@ function Confirm({
   children?: React.ReactNode
 }) {
   return (
-    <div className="mt-4 rounded-xl border border-accent/30 bg-accent/5 p-4">
+    <div className="mt-4 rounded-lg border border-accent/30 bg-accent/5 p-4">
       <p className="font-medium">{question}</p>
       <p className="mt-1 text-sm text-muted">{detail}</p>
       {children}

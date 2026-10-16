@@ -83,7 +83,7 @@ export function PlanEditor({
   return (
     <div className="space-y-3">
       {error && (
-        <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
@@ -126,13 +126,13 @@ function DayCard({
 
   return (
     <section className="card p-0">
-      <div className="flex items-center gap-3 p-4">
+      <div className="flex items-center gap-3 px-4 py-3.5">
         <button
           onClick={onToggle}
           aria-expanded={expanded}
           className="flex flex-1 items-center gap-3 text-left"
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-xs font-semibold text-muted">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-xs font-semibold text-muted">
             {DAY_NAMES[day.day_of_week].slice(0, 3)}
           </span>
           <span className="min-w-0">
@@ -179,7 +179,7 @@ function DayCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-edge p-4">
+        <div className="border-t border-edge px-4 py-4">
           {!readOnly && (
             <>
               <label className="label" htmlFor={`name-${day.id}`}>
@@ -209,7 +209,7 @@ function DayCard({
               No exercises yet.
             </p>
           ) : (
-            <ul className="mb-4 space-y-3">
+            <ul className="mb-4 divide-y divide-edge overflow-hidden rounded-lg border border-edge bg-surface-2">
               {day.routine_exercises.map((exercise, index) => (
                 <ExerciseRow
                   key={exercise.id}
@@ -233,7 +233,7 @@ function DayCard({
           )}
 
           {!readOnly && adding ? (
-            <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+            <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
               <p className="text-sm font-medium">How is this exercise measured?</p>
               <p className="mt-0.5 text-xs text-muted">
                 Reps for countable movements, time for holds and carries.
@@ -317,10 +317,10 @@ function ExerciseRow({
 
   if (readOnly) {
     return (
-      <li className="rounded-xl border border-edge bg-surface-2 p-3">
+        <li className="px-3 py-3">
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 truncate font-medium">{exercise.exercise_name}</p>
-          <span className="shrink-0 rounded-md bg-surface px-2 py-1 text-xs text-muted">
+          <span className="shrink-0 rounded-sm bg-surface px-2 py-1 text-xs text-muted">
             {isTime ? 'Time' : 'Reps'}
           </span>
         </div>
@@ -340,7 +340,7 @@ function ExerciseRow({
   }
 
   return (
-    <li className="rounded-xl border border-edge bg-surface-2 p-3">
+    <li className="px-3 py-3">
       <div className="flex items-center gap-2">
         <GripVertical className="size-4 shrink-0 text-muted" />
         {/* Keyed on the value: these inputs are uncontrolled, so without a
@@ -397,7 +397,7 @@ function ExerciseRow({
       </div>
 
       <div className="mt-2 pl-6">
-        <div className="mb-2 inline-flex rounded-lg border border-edge bg-surface p-0.5">
+        <div className="mb-3 inline-flex rounded-md border border-edge bg-surface p-0.5">
           {(['reps', 'time'] as const).map((m) => (
             <button
               key={m}
@@ -415,7 +415,7 @@ function ExerciseRow({
                   })),
                 )
               }}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors ${
                 isTime === (m === 'time')
                   ? 'bg-accent/15 text-accent'
                   : 'text-muted hover:text-foreground'
@@ -507,7 +507,7 @@ function ReadOnlyField({ label, value }: { label: string; value: number | null }
   return (
     <div>
       <p className="mb-1 text-xs text-muted">{label}</p>
-      <p className="rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-center text-sm">
+      <p className="border-b border-edge bg-surface px-2.5 py-1.5 text-center text-sm last:border-b-0">
         {value ?? '—'}
       </p>
     </div>

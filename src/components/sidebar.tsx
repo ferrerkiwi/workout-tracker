@@ -24,12 +24,12 @@ export function Sidebar() {
     <nav
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around
-                 border-t border-edge bg-surface/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur
+                 border-t border-edge bg-surface/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]
                  sm:inset-y-0 sm:right-auto sm:left-0 sm:w-[72px] sm:flex-col
                  sm:justify-start sm:gap-1 sm:border-t-0 sm:border-r sm:py-4"
     >
       <span className="mb-4 hidden size-10 items-center justify-center sm:flex">
-        <BrandMark size={40} className="rounded-xl shadow-lg shadow-black/35" />
+        <BrandMark size={40} className="rounded-lg" />
         <span className="sr-only">RepCadence</span>
       </span>
 
@@ -42,7 +42,7 @@ export function Sidebar() {
             title={label}
             aria-label={label}
             aria-current={active ? 'page' : undefined}
-            className={`group relative flex size-11 items-center justify-center rounded-xl transition
+            className={`group relative flex size-11 items-center justify-center rounded-lg transition-colors
               ${
                 active
                   ? 'bg-accent/15 text-accent'
@@ -52,8 +52,8 @@ export function Sidebar() {
             <Icon className="size-5" />
             <span
               className="pointer-events-none absolute left-full z-30 ml-2 hidden
-                         whitespace-nowrap rounded-lg border border-edge bg-surface-2
-                         px-2.5 py-1.5 text-xs font-medium opacity-0 transition
+                         whitespace-nowrap rounded-md border border-edge bg-surface-2
+                         px-2.5 py-1.5 text-xs font-medium opacity-0 transition-opacity
                          group-hover:opacity-100 sm:block"
             >
               {label}
