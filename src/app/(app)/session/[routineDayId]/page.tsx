@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { SessionLogger } from '@/components/session-logger'
 import { DAY_NAMES } from '@/lib/constants'
 import type { RoutineExercise } from '@/lib/queries'
-import { getLastPerformed, getProfile } from '@/lib/queries'
+import { getProfile } from '@/lib/queries'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import { isScheduledLaterThisWeek } from '@/lib/week'
 
@@ -35,10 +35,7 @@ export default async function SessionPage({
 
   const notYet = isScheduledLaterThisWeek(day.day_of_week)
 
-  const [profile, lastPerformed] = await Promise.all([
-    getProfile(supabase, user.id),
-    getLastPerformed(supabase, user.id),
-  ])
+  const profile = await getProfile(supabase, user.id)
   const unit = profile?.unit_preference ?? 'lbs'
 
   const exercises = [...((day.routine_exercises ?? []) as RoutineExercise[])].sort(
@@ -101,7 +98,6 @@ export default async function SessionPage({
           dayName={day.name}
           exercises={exercises}
           unit={unit}
-          lastPerformed={lastPerformed}
         />
       )}
     </main>

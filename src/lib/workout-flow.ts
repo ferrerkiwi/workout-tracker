@@ -30,11 +30,9 @@ export function progressionIncrement(type: MovementType, unit: string): number {
 
 export function startingWorkoutWeight(
   target: number | null,
-  previous: number | undefined,
 ): string {
-  // The saved plan includes earned increases and must win over old history.
-  const weight = target ?? previous
-  return weight == null ? '' : String(weight)
+  // A bodyweight plan must not inherit a load from an older workout.
+  return target == null ? '' : String(target)
 }
 
 export function formatSetElapsed(elapsedMs: number): string {

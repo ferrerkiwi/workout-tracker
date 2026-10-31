@@ -6,8 +6,10 @@ a focused Routine Coach, and Guided Set tempo cues for rep-based work.
 
 Workouts open to an exercise list. Start any exercise, review the next set's
 target and load, then use the elapsed timer or optional tempo guidance. Stopping
-tempo (by voice or button) opens the actual-reps form; results are saved only
-after confirmation. Each saved set advances to the next set of that exercise.
+tempo (by voice or button) opens the actual-reps form and starts a rest timer.
+Weights are read-only during workouts and are edited in the plan. Rest on the
+results screen, then choose **Save and continue to next set** to save the result
+and start the next set directly. The final set returns to the exercise list.
 
 Completing every rep target on a loaded exercise increases its plan weight once
 per workout: 10 lb for compound exercises or 5 lb for isolation exercises (the

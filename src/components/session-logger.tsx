@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { completeSet, finishSession, startSession, type LoggedSet } from '@/lib/session-actions'
-import { formatTarget, normaliseExerciseName, type LastPerformedMap, type RoutineExercise } from '@/lib/queries'
+import { formatTarget, type RoutineExercise } from '@/lib/queries'
 import { formatSetElapsed, inferMovementType, progressionIncrement, startingWorkoutWeight, type MovementType, type WorkoutExercise } from '@/lib/workout-flow'
 
 const GuidedSet = dynamic(() => import('@/components/guided-set').then((module) => module.GuidedSet), { ssr: false })
@@ -13,15 +13,14 @@ const GuidedSet = dynamic(() => import('@/components/guided-set').then((module) 
 type SetRow = { key: string; exerciseId: string; setIndex: number; amount: string; weight: string; completed: boolean }
 type Screen = { step: 'list' } | { step: 'prepare' | 'running' | 'result'; key: string }
 
-function buildRows(exercises: WorkoutExercise[], history: LastPerformedMap, saved: LoggedSet[]): SetRow[] {
+function buildRows(exercises: WorkoutExercise[], saved: LoggedSet[]): SetRow[] {
   return exercises.flatMap((exercise) => {
-    const last = history[normaliseExerciseName(exercise.exercise_name)]
     return Array.from({ length: exercise.target_sets }, (_, setIndex) => {
       const stored = saved.find((set) => set.exercise_name === exercise.exercise_name && set.order_index === exercise.order_index && set.set_index === setIndex)
       return {
         key: `${exercise.id}-${setIndex}`, exerciseId: exercise.id, setIndex,
         amount: String(stored ? (exercise.metric === 'time' ? stored.seconds : stored.reps) ?? '' : exercise.metric === 'time' ? exercise.target_seconds ?? 45 : exercise.target_reps),
-        weight: stored ? (stored.weight == null ? '' : String(stored.weight)) : startingWorkoutWeight(exercise.target_weight, last?.weights[setIndex] ?? last?.lastWeight),
+        weight: stored ? (stored.weight == null ? '' : String(stored.weight)) : startingWorkoutWeight(exercise.target_weight),
         completed: stored?.completed ?? false,
       }
     })
@@ -50,8 +49,23 @@ function SetTimer({ onFinish, onTempo, canUseTempo }: {
   )
 }
 
-export function SessionLogger({ routineDayId, dayName, exercises: planExercises, unit: profileUnit, lastPerformed }: {
-  routineDayId: string; dayName: string; exercises: RoutineExercise[]; unit: string; lastPerformed: LastPerformedMap
+function RestTimer({ startedAt, suggestedSeconds }: { startedAt: number; suggestedSeconds: number | null }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const timer = window.setInterval(() => setElapsed(performance.now() - startedAt), 200)
+    return () => window.clearInterval(timer)
+  }, [startedAt])
+  return (
+    <div className="rounded-lg bg-surface-2 p-5 text-center">
+      <p className="text-sm font-medium text-muted">Rest time</p>
+      <p className="mt-2 text-4xl font-bold tabular-nums" role="timer" aria-label="Rest time since finishing this set">{formatSetElapsed(elapsed)}</p>
+      {suggestedSeconds != null && <p className="mt-2 text-sm text-muted">Suggested rest: {formatSetElapsed(suggestedSeconds * 1000)}</p>}
+    </div>
+  )
+}
+
+export function SessionLogger({ routineDayId, dayName, exercises: planExercises, unit: profileUnit }: {
+  routineDayId: string; dayName: string; exercises: RoutineExercise[]; unit: string
 }) {
   const router = useRouter()
   const [exercises, setExercises] = useState<WorkoutExercise[]>([])
@@ -64,6 +78,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
   const [busy, setBusy] = useState(false)
   const [tempoOpen, setTempoOpen] = useState(false)
   const [actualAmount, setActualAmount] = useState('')
+  const [restStartedAt, setRestStartedAt] = useState(0)
   const [loadAttempt, setLoadAttempt] = useState(0)
   // Cover the interval before React paints a disabled save button.
   const saving = useRef(false)
@@ -83,7 +98,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
         }
         setSessionId(result.sessionId)
         setExercises(result.exercises)
-        setRows(buildRows(result.exercises, lastPerformed, result.sets ?? []))
+        setRows(buildRows(result.exercises, result.sets ?? []))
         setMovementTypes(Object.fromEntries(result.exercises.map((exercise) => [exercise.id, exercise.movement_type ?? inferMovementType(exercise.exercise_name)])))
       } catch {
         if (active) setError('Could not open the workout. Check your connection and try again.')
@@ -93,15 +108,12 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
     }
     void load()
     return () => { active = false }
-  }, [routineDayId, lastPerformed, loadAttempt])
+  }, [routineDayId, loadAttempt])
 
   const row = screen.step === 'list' ? null : rows.find((entry) => entry.key === screen.key) ?? null
   const exercise = row ? exercises.find((entry) => entry.id === row.exerciseId) ?? null : null
+  const nextRow = row ? rows.find((entry) => entry.exerciseId === row.exerciseId && entry.key !== row.key && !entry.completed) : null
   const completedCount = rows.filter((entry) => entry.completed).length
-
-  function patchRow(patch: Partial<SetRow>) {
-    if (row) setRows((previous) => previous.map((entry) => entry.key === row.key ? { ...entry, ...patch } : entry))
-  }
 
   function openExercise(selected: WorkoutExercise) {
     const next = rows.find((entry) => entry.exerciseId === selected.id && !entry.completed)
@@ -110,6 +122,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
 
   function finishSet(elapsedMs?: number, tempoReps?: number) {
     if (!row || !exercise) return
+    setRestStartedAt(performance.now())
     setTempoOpen(false)
     setActualAmount(exercise.metric === 'time' ? String(Math.min(3600, Math.floor((elapsedMs ?? 0) / 1000))) : tempoReps == null ? '' : String(tempoReps))
     setError(null)
@@ -143,10 +156,10 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
       if (result.error) { setError(result.error); return }
       setRows((previous) => previous.map((entry) => entry.key === row.key
         ? { ...entry, amount: String(amount), completed: true }
-        : entry.exerciseId === exercise.id && !entry.completed ? { ...entry, weight: row.weight } : entry))
+        : entry))
       if (result.nextWeight != null) setExercises((previous) => previous.map((entry) => entry.id === exercise.id ? { ...entry, next_weight: result.nextWeight! } : entry))
       const next = rows.find((entry) => entry.exerciseId === exercise.id && entry.key !== row.key && !entry.completed)
-      setScreen(next ? { step: 'prepare', key: next.key } : { step: 'list' })
+      setScreen(next ? { step: 'running', key: next.key } : { step: 'list' })
     } catch {
       setError('Could not save the set. Your result is still here; try saving again.')
     } finally { saving.current = false; setBusy(false) }
@@ -206,7 +219,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
             <div className="mt-6 space-y-6">
               <div className="grid grid-cols-2 gap-4 rounded-lg bg-surface-2 p-5">
                 <div><p className="text-sm text-muted">Target {exercise.metric === 'time' ? 'seconds' : 'reps'}</p><p className="mt-2 text-4xl font-bold tabular-nums">{exercise.metric === 'time' ? exercise.target_seconds : exercise.target_reps}</p></div>
-                <label className="text-sm text-muted" htmlFor="set-weight">Weight ({unit})<input id="set-weight" type="number" inputMode="decimal" min="0" max="5000" step="any" placeholder="Bodyweight" className="input mt-2" value={row.weight} onChange={(event) => patchRow({ weight: event.target.value })} /></label>
+                <div><p className="text-sm text-muted">Plan weight</p><p className="mt-2 text-2xl font-bold tabular-nums">{row.weight ? `${row.weight} ${unit}` : 'Bodyweight'}</p></div>
               </div>
               {exercise.notes && <p className="text-sm text-muted">{exercise.notes}</p>}
               {exercise.metric === 'reps' && <div>
@@ -228,18 +241,20 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
             <SetTimer key={row.key} canUseTempo={exercise.metric === 'reps'} onFinish={(elapsed) => finishSet(elapsed)} onTempo={() => setTempoOpen(true)} />
           </> : (
             <form className="mt-8 space-y-6" onSubmit={(event) => { event.preventDefault(); void saveResult() }}>
+              <RestTimer key={row.key} startedAt={restStartedAt} suggestedSeconds={exercise.rest_seconds} />
               <div>
                 <label className="text-lg font-semibold" htmlFor="actual-amount">{exercise.metric === 'time' ? 'How many seconds did you do?' : 'How many reps did you actually do?'}</label>
                 <p className="mt-2 text-sm text-muted">Target: {exercise.metric === 'time' ? `${exercise.target_seconds} seconds` : `${exercise.target_reps} reps`}. Confirm your result before saving.</p>
                 <input key={row.key} autoFocus id="actual-amount" type="number" inputMode="numeric" min="0" max={exercise.metric === 'time' ? 3600 : 1000} step="1" required className="input mt-4 py-4 text-center text-3xl" value={actualAmount} disabled={busy} onChange={(event) => setActualAmount(event.target.value)} />
               </div>
-              <label className="block text-sm font-medium" htmlFor="actual-weight">Weight actually used ({unit})<input id="actual-weight" type="number" inputMode="decimal" min="0" max="5000" step="any" placeholder="Bodyweight" className="input mt-2" value={row.weight} disabled={busy} onChange={(event) => patchRow({ weight: event.target.value })} /></label>
+              <p className="text-sm text-muted">Plan weight: {row.weight ? `${row.weight} ${unit}` : 'Bodyweight'}. Change weight in your workout plan.</p>
               {exercise.metric === 'reps' && <label className="block text-sm font-medium" htmlFor="result-movement-type">Exercise type
                 <select id="result-movement-type" className="input mt-2" disabled={busy} value={movementTypes[exercise.id] ?? ''} onChange={(event) => setMovementTypes((previous) => ({ ...previous, [exercise.id]: event.target.value as MovementType || null }))}>
                   <option value="">Choose type</option><option value="compound">Compound · multiple joints</option><option value="isolation">Isolation · one joint</option>
                 </select>
               </label>}
-              <button type="submit" className="btn-primary min-h-14 w-full" disabled={busy}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}Save set</button>
+              <button type="submit" className="btn-primary min-h-14 w-full" disabled={busy}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}{nextRow ? 'Save and continue to next set' : 'Save and finish exercise'}</button>
+              {nextRow && <p className="text-center text-sm text-muted">Starts set {nextRow.setIndex + 1} immediately. Continue when you’re rested and ready.</p>}
             </form>
           )}
         </section>

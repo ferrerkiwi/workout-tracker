@@ -36,11 +36,10 @@ test('progression uses the requested pound increases and converts kilogram plans
   assert.equal(progressionIncrement('isolation', 'kg'), 2.27)
 })
 
-test('earned plan weights take priority over previous workout history', () => {
-  assert.equal(startingWorkoutWeight(145, 135), '145')
-  assert.equal(startingWorkoutWeight(null, 135), '135')
-  assert.equal(startingWorkoutWeight(null, undefined), '')
-  assert.equal(startingWorkoutWeight(0, 135), '0')
+test('workout weights come only from the plan, including bodyweight and zero loads', () => {
+  assert.equal(startingWorkoutWeight(145), '145')
+  assert.equal(startingWorkoutWeight(null), '')
+  assert.equal(startingWorkoutWeight(0), '0')
 })
 
 test('set timer displays full elapsed minutes without resetting at one hour', () => {
