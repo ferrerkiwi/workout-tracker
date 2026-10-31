@@ -2,9 +2,9 @@
 
 import { Bot, Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { boundedCoachHistory } from '@/lib/coach-request'
-import type { RefObject } from 'react'
+import { useModalDialog } from '@/lib/use-modal-dialog'
 
 type ChatMessage = {
   role: 'user' | 'assistant'
@@ -28,14 +28,6 @@ export function RoutineCoach() {
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null)
   const retryRequestId = useRef<string | null>(null)
   const [canRetry, setCanRetry] = useState(true)
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: 'smooth',
-    })
-  }, [messages, busy, error, drawerOpen])
 
   async function sendMessage(
     message: string,
@@ -106,7 +98,6 @@ export function RoutineCoach() {
       draft={draft}
       error={error}
       messages={messages}
-      scrollRef={scrollRef}
       setDraft={setDraft}
       onSubmit={onSubmit}
       onSuggestion={(suggestion) => void sendMessage(suggestion)}
@@ -127,40 +118,47 @@ export function RoutineCoach() {
       <button
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="btn-ghost fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 border-accent/40 bg-surface shadow-lg shadow-black/25 sm:bottom-4 lg:hidden"
+        className="btn-ghost fixed right-4 bottom-[calc(var(--mobile-nav-height)+1rem)] z-30 border-accent/40 bg-surface shadow-lg shadow-black/25 sm:bottom-4 lg:hidden"
       >
         <MessageCircle className="size-4" />
         Routine coach
       </button>
 
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close routine coach"
-            className="absolute inset-0 bg-background/80"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <section className="absolute inset-x-0 bottom-0 flex max-h-[90dvh] min-h-[70dvh] flex-col rounded-t-lg border border-edge bg-surface p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bot className="size-5 text-accent" />
-                <h2 className="font-semibold">Routine coach</h2>
-              </div>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setDrawerOpen(false)}
-                className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            {panel}
-          </section>
-        </div>
-      )}
+      {drawerOpen && <CoachDrawer onClose={() => setDrawerOpen(false)}>
+        <CoachPanel
+          busy={busy} draft={draft} error={error} messages={messages}
+          setDraft={setDraft} onSubmit={onSubmit}
+          onSuggestion={(suggestion) => void sendMessage(suggestion)}
+          canRetry={canRetry}
+          onRetry={() => { if (canRetry && lastUserMessage) void sendMessage(lastUserMessage, { appendUserMessage: false }) }}
+          inDrawer
+        />
+      </CoachDrawer>}
     </>
+  )
+}
+
+function CoachDrawer({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  const ref = useModalDialog()
+  const titleId = useId()
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)')
+    const closeOnDesktop = () => { if (desktop.matches) onClose() }
+    desktop.addEventListener('change', closeOnDesktop)
+    return () => desktop.removeEventListener('change', closeOnDesktop)
+  }, [onClose])
+  return (
+    <dialog ref={ref} aria-labelledby={titleId} className="modal-viewport bg-transparent open:flex open:items-end open:justify-center"
+      onCancel={(event) => { event.preventDefault(); onClose() }}
+      onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="coach-drawer flex min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-t-lg border border-edge bg-surface shadow-2xl">
+        <header className="mb-3 flex shrink-0 items-center justify-between gap-3">
+          <h2 id={titleId} className="font-semibold">Routine coach</h2>
+          <button type="button" aria-label="Close routine coach" onClick={onClose} className="btn-ghost min-h-[44px] min-w-[44px] shrink-0 px-0"><X className="size-5" /></button>
+        </header>
+        {children}
+      </section>
+    </dialog>
   )
 }
 
@@ -169,27 +167,32 @@ function CoachPanel({
   draft,
   error,
   messages,
-  scrollRef,
   setDraft,
   onSubmit,
   onSuggestion,
   onRetry,
   canRetry,
+  inDrawer = false,
 }: {
   busy: boolean
   draft: string
   error: string | null
   messages: ChatMessage[]
-  scrollRef: RefObject<HTMLDivElement | null>
   setDraft: (value: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onSuggestion: (suggestion: string) => void
   canRetry: boolean
+  inDrawer?: boolean
   onRetry: () => void
 }) {
+  const inputId = useId()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' })
+  }, [messages, busy, error])
   return (
-    <section className="flex h-[min(720px,calc(100dvh-4rem))] min-h-0 flex-col overflow-hidden rounded-lg border border-edge bg-surface">
-      <div className="border-b border-edge p-4">
+    <section className={`flex min-h-0 flex-col overflow-hidden rounded-lg border border-edge bg-surface ${inDrawer ? 'flex-1' : 'h-[min(720px,calc(100dvh-4rem))]'}`}>
+      {!inDrawer && <div className="shrink-0 border-b border-edge p-4">
         <div className="flex items-center gap-2">
           <Bot className="size-5 text-accent" />
           <h2 className="font-semibold">Routine coach</h2>
@@ -197,11 +200,15 @@ function CoachPanel({
         <p className="mt-1 text-sm text-muted">
           Ask about your week or request a specific edit.
         </p>
-      </div>
+      </div>}
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
+        tabIndex={0}
+        role="log"
+        aria-label="Coach conversation"
+        aria-live="polite"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4"
       >
         {messages.length === 0 ? (
           <div className="space-y-3">
@@ -252,13 +259,14 @@ function CoachPanel({
         )}
       </div>
 
-      <form onSubmit={onSubmit} className="border-t border-edge p-3">
-        <label className="sr-only" htmlFor="routine-coach-message">
+      <form onSubmit={onSubmit} className="shrink-0 border-t border-edge p-3">
+        <label className="sr-only" htmlFor={inputId}>
           Message routine coach
         </label>
         <div className="flex items-end gap-2">
           <textarea
-            id="routine-coach-message"
+            id={inputId}
+            data-dialog-initial-focus={inDrawer ? true : undefined}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -270,14 +278,14 @@ function CoachPanel({
             maxLength={1200}
             rows={2}
             placeholder="Ask or request a focused edit..."
-            className="input min-h-11 resize-none"
+            className="input min-h-11 resize-none text-base"
             disabled={busy}
           />
           <button
             type="submit"
             disabled={busy || draft.trim().length === 0}
             aria-label="Send message"
-            className="btn-primary size-11 shrink-0 px-0"
+            className="btn-primary min-h-[44px] min-w-[44px] shrink-0 px-0"
           >
             {busy ? (
               <Loader2 className="size-4 animate-spin" />
@@ -296,7 +304,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[88%] rounded-md px-3 py-2 text-sm ${
+        className={`min-w-0 max-w-[95%] wrap-anywhere rounded-md px-3 py-2 text-sm ${
           isUser
             ? 'bg-accent/15 text-foreground'
             : 'border-l-2 border-edge pl-3 text-foreground'

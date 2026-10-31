@@ -8,8 +8,9 @@ Workouts open to an exercise list. Start any exercise, review the next set's
 target and load, then use the elapsed timer or optional tempo guidance. Stopping
 tempo (by voice or button) opens the actual-reps form and starts a rest timer.
 Weights are read-only during workouts and are edited in the plan. Rest on the
-results screen, then choose **Save and continue to next set** to save the result
-and start the next set directly. The final set returns to the exercise list.
+results screen, then choose **Save result and rest**. The saved rest state shows
+your elapsed rest and a separate **Start next set** action. **Save and start next
+set now** provides a one-tap shortcut. The final set returns to the exercise list.
 
 Completing every rep target on a loaded exercise increases its plan weight once
 per workout: 10 lb for compound exercises or 5 lb for isolation exercises (the
@@ -66,6 +67,20 @@ baseline migration. Do not reset the production project.
 Supabase Auth's leaked-password protection is available only on Pro and above.
 The advisor will continue to report it while this project remains on the Free
 plan; no billing change is required for the application to operate.
+
+## Navigation, progress, and accessibility
+
+Mobile navigation includes visible labels and keeps the active green state.
+The dashboard compares loaded training volume with the same weekdays last week,
+converting saved workout units before adding totals. Empty baselines show a
+starter message rather than an invented percentage.
+
+Routine Coach and Guided Set use native modal dialogs with initial focus,
+forward/backward Tab containment, Escape dismissal, focus restoration, and
+background scroll locking. The coach has one scrollable conversation area; its
+composer stays within the available visual viewport as a keyboard opens. Modal
+layouts account for safe areas. Tempo announcements update at phase/rep changes;
+elapsed timers do not announce every animation frame.
 
 ## Dates, units, and AI limits
 

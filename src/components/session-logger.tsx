@@ -12,7 +12,7 @@ import { formatSetElapsed, inferMovementType, progressionIncrement, startingWork
 const GuidedSet = dynamic(() => import('@/components/guided-set').then((module) => module.GuidedSet), { ssr: false })
 
 type SetRow = { key: string; exerciseId: string; setIndex: number; amount: string; weight: string; completed: boolean }
-type Screen = { step: 'list' } | { step: 'prepare' | 'running' | 'result'; key: string }
+type Screen = { step: 'list' } | { step: 'prepare' | 'running' | 'result' | 'rest'; key: string }
 
 function buildRows(exercises: WorkoutExercise[], saved: LoggedSet[]): SetRow[] {
   return exercises.flatMap((exercise) => {
@@ -39,9 +39,9 @@ function SetTimer({ onFinish, onTempo, canUseTempo }: {
     return () => window.clearInterval(timer)
   }, [])
   return (
-    <div className="py-8 text-center sm:py-14">
+    <div className="py-8 text-center [container-type:inline-size] sm:py-14">
       <p className="text-sm font-medium text-muted">Set in progress</p>
-      <p className="my-8 text-7xl font-bold tabular-nums sm:text-8xl" role="timer" aria-label="Time spent on this set">{formatSetElapsed(elapsed)}</p>
+      <p className="my-8 text-[min(4.5rem,22cqw)] font-bold tabular-nums" role="timer" aria-label="Time spent on this set">{formatSetElapsed(elapsed)}</p>
       <div className="mx-auto flex max-w-sm flex-col gap-3">
         {canUseTempo && <button type="button" className="btn-ghost min-h-14 border border-edge" onClick={onTempo}><Timer className="size-5" />Use tempo</button>}
         <button type="button" className="btn-primary min-h-14" onClick={() => onFinish(performance.now() - (startedAt.current ?? performance.now()))}><Check className="size-5" />Finish set</button>
@@ -60,6 +60,7 @@ function RestTimer({ startedAt, suggestedSeconds }: { startedAt: number; suggest
     <div className="rounded-lg bg-surface-2 p-5 text-center">
       <p className="text-sm font-medium text-muted">Rest time</p>
       <p className="mt-2 text-4xl font-bold tabular-nums" role="timer" aria-label="Rest time since finishing this set">{formatSetElapsed(elapsed)}</p>
+      <p className="sr-only" role="status">{suggestedSeconds != null && elapsed >= suggestedSeconds * 1000 ? 'Suggested rest reached. Start your next set when ready.' : ''}</p>
       {suggestedSeconds != null && <p className="mt-2 text-sm text-muted">Suggested rest: {formatSetElapsed(suggestedSeconds * 1000)}</p>}
     </div>
   )
@@ -138,7 +139,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
     return null
   }
 
-  async function saveResult() {
+  async function saveResult(startImmediately = false) {
     if (!row || !exercise || saving.current) return
     const amount = actualAmount.trim() === '' ? NaN : Number(actualAmount)
     const maximum = exercise.metric === 'time' ? 3600 : 1000
@@ -161,7 +162,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
         : entry))
       if (result.nextWeight != null) setExercises((previous) => previous.map((entry) => entry.id === exercise.id ? { ...entry, next_weight: result.nextWeight! } : entry))
       const next = rows.find((entry) => entry.exerciseId === exercise.id && entry.key !== row.key && !entry.completed)
-      setScreen(next ? { step: 'running', key: next.key } : { step: 'list' })
+      setScreen(next ? { step: startImmediately ? 'running' : 'rest', key: next.key } : { step: 'list' })
     } catch {
       setError('Could not save the set. Your result is still here; try saving again.')
     } finally { saving.current = false; setBusy(false) }
@@ -194,7 +195,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
             const complete = done === entry.target_sets
             return (
               <section key={entry.id} className="card">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0"><h3 className="text-lg font-semibold">{entry.exercise_name}</h3><p className="mt-1 text-sm text-muted">{formatTarget(entry)} · {done} / {entry.target_sets} sets done</p></div>
                   <button type="button" className={complete ? 'btn-ghost shrink-0' : 'btn-primary shrink-0'} disabled={complete || busy} onClick={() => openExercise(entry)} aria-label={`${complete ? 'Completed' : 'Start'} ${entry.exercise_name}`}>
                     {complete ? <Check className="size-4" /> : <Play className="size-4" />}{complete ? 'Done' : 'Start'}
@@ -205,7 +206,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
               </section>
             )
           })}
-          <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 border-t border-edge bg-surface px-4 py-3 sm:bottom-0 sm:left-[72px]">
+          <div className="fixed inset-x-0 bottom-[calc(var(--mobile-nav-height)+1rem)] z-10 border-t border-edge bg-surface px-4 py-3 sm:bottom-0 sm:left-[72px]">
             <div className="mx-auto max-w-3xl">
               <button type="button" className="btn-primary min-h-12 w-full" disabled={busy || completedCount === 0} onClick={() => void finishWorkout()}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}Finish workout</button>
               {completedCount > 0 && completedCount < rows.length && <p className="mt-2 text-center text-xs text-muted">You can finish early. Only completed sets will be recorded in history.</p>}
@@ -213,13 +214,13 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
           </div>
         </>
       ) : row && exercise ? (
-        <section className="card">
-          {screen.step === 'prepare' && <button type="button" className="mb-5 inline-flex items-center gap-2 text-sm text-muted hover:text-foreground" onClick={() => { setError(null); setScreen({ step: 'list' }) }}><ArrowLeft className="size-4" />All exercises</button>}
+        <section className="card min-w-0 wrap-anywhere">
+          {(screen.step === 'prepare' || screen.step === 'rest') && <button type="button" className="mb-5 inline-flex items-center gap-2 text-sm text-muted hover:text-foreground" onClick={() => { setError(null); setScreen({ step: 'list' }) }}><ArrowLeft className="size-4" />All exercises</button>}
           <p className="text-sm font-medium text-accent">{dayName} · Set {row.setIndex + 1} of {exercise.target_sets}</p>
           <h2 className="mt-2 text-2xl font-bold">{exercise.exercise_name}</h2>
           {screen.step === 'prepare' ? (
             <div className="mt-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4 rounded-lg bg-surface-2 p-5">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-4 rounded-lg bg-surface-2 p-5">
                 <div><p className="text-sm text-muted">Target {exercise.metric === 'time' ? 'seconds' : 'reps'}</p><p className="mt-2 text-4xl font-bold tabular-nums">{exercise.metric === 'time' ? exercise.target_seconds : exercise.target_reps}</p></div>
                 <div><p className="text-sm text-muted">Plan weight</p><p className="mt-2 text-2xl font-bold tabular-nums">{row.weight ? `${row.weight} ${unit}` : 'Bodyweight'}</p></div>
               </div>
@@ -238,11 +239,19 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
                 setError(null); setScreen({ step: 'running', key: row.key })
               }}><Play className="size-5" />Start set</button>
             </div>
+          ) : screen.step === 'rest' ? (
+            <div className="mt-6 space-y-5">
+              <p role="status" className="font-medium text-accent">Set saved. Rest before your next set.</p>
+              <RestTimer startedAt={restStartedAt} suggestedSeconds={exercise.rest_seconds} />
+              <p className="text-sm text-muted">Next: set {row.setIndex + 1} · {exercise.metric === 'time' ? `${exercise.target_seconds} seconds` : `${exercise.target_reps} reps`} · {row.weight ? `${row.weight} ${unit}` : 'Bodyweight'}</p>
+              <button autoFocus type="button" className="btn-primary min-h-14 w-full" onClick={() => setScreen({ step: 'running', key: row.key })}><Play className="size-5" />Start next set</button>
+              <p className="text-sm text-muted">The next set starts only when you press Start next set.</p>
+            </div>
           ) : screen.step === 'running' ? <>
             <p className="mt-2 text-sm text-muted">Target {exercise.metric === 'time' ? `${exercise.target_seconds}s` : `${exercise.target_reps} reps`} · {row.weight ? `${row.weight} ${unit}` : 'Bodyweight'}</p>
             <SetTimer key={row.key} canUseTempo={exercise.metric === 'reps'} onFinish={(elapsed) => finishSet(elapsed)} onTempo={() => setTempoOpen(true)} />
           </> : (
-            <form className="mt-8 space-y-6" onSubmit={(event) => { event.preventDefault(); void saveResult() }}>
+            <form className="mt-8 space-y-6" onSubmit={(event) => { event.preventDefault(); void saveResult((event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'start') }}>
               <RestTimer key={row.key} startedAt={restStartedAt} suggestedSeconds={exercise.rest_seconds} />
               <div>
                 <label className="text-lg font-semibold" htmlFor="actual-amount">{exercise.metric === 'time' ? 'How many seconds did you do?' : 'How many reps did you actually do?'}</label>
@@ -255,8 +264,8 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
                   <option value="">Choose type</option><option value="compound">Compound · multiple joints</option><option value="isolation">Isolation · one joint</option>
                 </select>
               </label>}
-              <button type="submit" className="btn-primary min-h-14 w-full" disabled={busy}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}{nextRow ? 'Save and continue to next set' : 'Save and finish exercise'}</button>
-              {nextRow && <p className="text-center text-sm text-muted">Starts set {nextRow.setIndex + 1} immediately. Continue when you’re rested and ready.</p>}
+              <button type="submit" className="btn-primary min-h-14 w-full" disabled={busy}>{busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}{nextRow ? 'Save result and rest' : 'Save and finish exercise'}</button>
+              {nextRow && <button type="submit" name="next-action" value="start" className="btn-ghost min-h-12 w-full" disabled={busy}><Play className="size-4" />Save and start next set now</button>}
             </form>
           )}
         </section>

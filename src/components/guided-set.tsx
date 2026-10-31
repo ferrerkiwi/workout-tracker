@@ -2,12 +2,14 @@
 
 import { Mic, MicOff, Pause, Play, Volume2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useModalDialog } from '@/lib/use-modal-dialog'
 import {
   READY_DURATION_MS,
   getCompletedReps,
   getReadyCountdown,
   getTempoSnapshot,
   isVoiceStopCommand,
+  tempoAnnouncement,
   type GuidedSetPhase,
 } from '@/lib/guided-set'
 
@@ -79,11 +81,13 @@ export function GuidedSet({
   onComplete: (completedReps: number) => void
   onClose: () => void
 }) {
+  const dialogRef = useModalDialog()
   const [status, setStatus] = useState<GuidedSetStatus>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [voiceStatus, setVoiceStatus] = useState<
     'checking' | 'listening' | 'unsupported' | 'unavailable'
   >('checking')
+  const stopButtonRef = useRef<HTMLButtonElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
@@ -156,6 +160,10 @@ export function GuidedSet({
     void navigator.wakeLock
       .request('screen')
       .then((sentinel) => {
+        if (stoppingRef.current || runningStartedAtRef.current === null) {
+          void sentinel.release().catch(() => undefined)
+          return
+        }
         wakeLockRef.current = sentinel
       })
       .catch(() => undefined)
@@ -299,6 +307,7 @@ export function GuidedSet({
       }
     }
 
+    if (stoppingRef.current) return
     voiceCanRestartRef.current = true
     voiceRestartCountRef.current = 0
     setVoiceStatus(
@@ -402,40 +411,38 @@ export function GuidedSet({
     }
   }, [])
 
+  useEffect(() => {
+    // Starting/resuming replaces its trigger button; keep focus inside the modal.
+    if ((status === 'ready' || status === 'running') && !dialogRef.current?.contains(document.activeElement)) {
+      stopButtonRef.current?.focus({ preventScroll: true })
+    }
+  }, [status, dialogRef])
+
   const snapshot = getTempoSnapshot(elapsedMs)
   const phase = phaseCopy(snapshot.phase)
   const readyCountdown = getReadyCountdown(elapsedMs)
   const canStop = status === 'ready' || status === 'running' || status === 'paused'
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex min-h-dvh items-stretch bg-background p-0 sm:items-center sm:justify-center sm:p-8"
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
+      className="modal-viewport bg-background open:flex open:items-stretch sm:items-center sm:justify-center sm:p-4"
+      onCancel={(event) => { event.preventDefault(); cancel() }}
       aria-label={`Guided set for ${exerciseName}`}
     >
-      <div className="flex max-h-dvh w-full max-w-xl flex-1 flex-col overflow-hidden border border-edge bg-surface sm:max-h-[calc(100dvh-4rem)] sm:flex-none sm:rounded-lg">
-        <header className="flex shrink-0 items-start justify-between border-b border-edge border-l-2 border-l-accent px-5 py-4">
-          <div>
+      <div className="flex h-full min-h-0 w-full max-w-xl flex-1 flex-col overflow-hidden border border-edge bg-surface sm:rounded-lg">
+        <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{tempoAnnouncement(status, elapsedMs)}</p>
+        <header className="shrink-0 border-b border-edge border-l-2 border-l-accent px-5 py-3">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-accent">Guided set</p>
-            <h2 className="mt-1 text-xl font-bold">{exerciseName}</h2>
-            <p className="mt-1 text-sm text-muted">
-              Set {setNumber} · Target: {targetReps} reps
-              {weight ? ` · ${weight} ${unit}` : ''}
-            </p>
+            <button type="button" className="btn-ghost min-h-[44px] min-w-[44px] shrink-0 px-0" onClick={cancel} aria-label="Cancel guided set"><X className="size-5" /></button>
           </div>
-          <button
-            type="button"
-            className="btn-ghost size-10 px-0"
-            onClick={cancel}
-            aria-label="Cancel guided set"
-          >
-            <X className="size-5" />
-          </button>
+          <h2 className="mt-1 text-xl font-bold wrap-anywhere">{exerciseName}</h2>
+          <p className="mt-1 text-sm text-muted wrap-anywhere">Set {setNumber} · Target: {targetReps} reps{weight ? ` · ${weight} ${unit}` : ''}</p>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col items-center justify-center px-6 py-4 text-center">
+        <main tabIndex={0} aria-label="Tempo guidance" className="min-h-0 flex-1 overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-accent">
+          <div className="flex min-h-full flex-col items-center justify-center px-4 py-4 text-center wrap-anywhere">
           {status === 'idle' ? (
             <>
               <Volume2 className="size-10 text-accent" />
@@ -445,7 +452,8 @@ export function GuidedSet({
               </p>
               <button
                 type="button"
-                className="btn-primary mt-8 min-h-14 px-8 text-base"
+                className="btn-primary mt-8 min-h-14 px-4 text-base"
+                data-dialog-initial-focus
                 onClick={() => void begin()}
               >
                 <Play className="size-5" />
@@ -469,7 +477,7 @@ export function GuidedSet({
               <p className="text-sm text-muted">completed reps</p>
               <button
                 type="button"
-                className="btn-primary mt-8 min-h-14 px-8 text-base"
+                className="btn-primary mt-8 min-h-14 px-4 text-base"
                 onClick={resume}
               >
                 <Play className="size-5" />
@@ -478,13 +486,13 @@ export function GuidedSet({
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-accent">{snapshot.completedReps} completed reps · Rep {snapshot.completedReps + 1}</p>
+              <p className="text-sm font-semibold text-accent">{snapshot.completedReps} completed {snapshot.completedReps === 1 ? 'rep' : 'reps'} · Rep {snapshot.completedReps + 1}</p>
               <p className="mt-4 text-4xl font-bold">{phase.label}</p>
               <p className="mt-2 text-sm text-muted">{phase.description}</p>
               <p className="mt-3 text-7xl font-bold tabular-nums text-accent">
                 {snapshot.phaseCountdown}
               </p>
-              <div className="mt-4 flex items-center gap-2 text-xs text-muted" aria-live="polite">
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted" aria-live="polite">
                 {voiceStatus === 'listening' ? (
                   <Mic className="size-4 text-accent" />
                 ) : (
@@ -504,10 +512,11 @@ export function GuidedSet({
         </main>
 
         {canStop && (
-          <footer className="shrink-0 border-t border-edge p-5">
+          <footer className="shrink-0 border-t border-edge px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={() => void finishSet()}
+              ref={stopButtonRef}
               className="btn-danger min-h-16 w-full text-base"
             >
               Stop Set
@@ -522,6 +531,6 @@ export function GuidedSet({
           </footer>
         )}
       </div>
-    </div>
+    </dialog>
   )
 }

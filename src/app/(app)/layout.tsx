@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
     <div className="min-h-dvh">
       <Sidebar />
       {/* Bottom bar on mobile, left rail from sm up. */}
-      <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0 sm:pl-[72px]">
+      <div className="pb-[calc(var(--mobile-nav-height)+1rem)] sm:pb-0 sm:pl-[72px]">
         {isDemo && (
           <p className="border-b border-accent/20 bg-accent/10 px-4 py-2 text-center text-xs text-accent sm:px-8">
             Demo mode · Changes are temporary.

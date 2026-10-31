@@ -3,6 +3,7 @@
 /* RepCadence uses the mark's near-black field and training green deliberately:
    structure stays neutral; green identifies action, progress, and selection. */
 :root {
+  --mobile-nav-height: calc(4rem + env(safe-area-inset-bottom));
   --background: #090b09;
   --foreground: #f5f7f4;
   --muted: #9ca69f;
@@ -51,7 +52,7 @@ body {
 
   .input {
     @apply w-full rounded-lg border border-edge bg-surface-2 px-3.5 py-2.5
-           text-[15px] text-foreground placeholder:text-muted/60
+           text-[15px] text-foreground placeholder:text-muted
            outline-none transition-colors
            focus:border-accent/70 focus:ring-2 focus:ring-accent/20;
   }
@@ -104,4 +105,26 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* One visible viewport, one scroll area per modal. The visual viewport follows
+   mobile keyboards as well as browser zoom, without nesting viewport heights. */
+.modal-viewport {
+  position: fixed;
+  inset: auto 0;
+  top: var(--visible-top, 0px);
+  width: 100%;
+  height: var(--visible-height, 100dvh);
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--foreground);
+  overflow: hidden;
+}
+.modal-viewport::backdrop { background: rgb(0 0 0 / 70%); }
+.coach-drawer {
+  height: min(90%, 48rem);
+  padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }

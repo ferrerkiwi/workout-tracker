@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { VolumeProgression } from '@/components/volume-progression'
 import { getUserToday, getRequestTimeZone } from '@/lib/request-date'
 import { convertWeight } from '@/lib/weight'
 import { DAY_NAMES } from '@/lib/constants'
@@ -34,11 +35,12 @@ export default async function DashboardPage() {
   const now = await getUserToday()
   const weekStart = startOfWeek(now)
 
-  const [profile, routine, streakSource, weekSessions] = await Promise.all([
+  const [profile, routine, streakSource, weekSessions, previousSessions] = await Promise.all([
     getProfile(supabase, user.id),
     getActiveRoutine(supabase, user.id),
     getStreakSource(supabase, now),
     getThisWeekSessions(supabase, user.id, now),
+    getThisWeekSessions(supabase, user.id, addDays(now, -7)),
   ])
 
   const unit = profile?.unit_preference ?? 'lbs'
@@ -161,7 +163,9 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section className="mt-8 border-y border-edge py-5">
+      <VolumeProgression current={weekSessions} previous={previousSessions} unit={unit} through={now.toLocaleDateString(undefined, { weekday: 'long' })} />
+
+      <section className="mt-6 border-y border-edge py-5">
         <div className="grid gap-5 sm:grid-cols-2 sm:gap-8">
           <StatCard
             label="Current streak"

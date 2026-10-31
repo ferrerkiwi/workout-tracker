@@ -51,3 +51,13 @@ export function isVoiceStopCommand(transcript: string): boolean {
     .trim()
   return normalised === 'stop' || normalised === 'stop set'
 }
+
+/** Announce state/phase changes rather than every animation frame or second. */
+export function tempoAnnouncement(status: string, elapsedMs: number): string {
+  if (status === 'idle') return 'Guided set ready. Press Start guided set.'
+  if (status === 'ready') return `Get ready. ${getReadyCountdown(elapsedMs)}.`
+  const snapshot = getTempoSnapshot(elapsedMs)
+  const completed = `${snapshot.completedReps} completed ${snapshot.completedReps === 1 ? 'rep' : 'reps'}`
+  if (status === 'paused') return `Guided set paused. ${completed}.`
+  return `${completed}. ${snapshot.phase === 'eccentric' ? 'Lower for three seconds.' : 'Lift.'}`
+}

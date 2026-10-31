@@ -121,13 +121,15 @@ export async function getStreakSource(supabase: Client, date = today()) {
 /** Completed sessions in the current Monday-start week. */
 export async function getThisWeekSessions(supabase: Client, userId: string, date = today()) {
   const weekStart = toDateKey(startOfWeek(date))
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('workout_sessions')
     .select('id, name, performed_on, total_volume, routine_day_id, unit')
     .eq('user_id', userId)
     .not('completed_at', 'is', null)
     .gte('performed_on', weekStart)
+    .lte('performed_on', toDateKey(date))
     .order('performed_on', { ascending: false })
+  if (error) throw new Error('Could not load workout volume. Please refresh.')
   return data ?? []
 }
 
