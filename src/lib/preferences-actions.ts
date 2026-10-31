@@ -90,5 +90,7 @@ export async function savePreferences(
 
   revalidatePath('/settings')
   revalidatePath('/dashboard')
+  revalidatePath('/plan')
+  revalidatePath('/history')
   return { saved: true }
 }

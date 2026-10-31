@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { completeSet, finishSession, startSession, type LoggedSet } from '@/lib/session-actions'
+import { syncBrowserTimeZone } from '@/lib/time-zone'
 import { formatTarget, type RoutineExercise } from '@/lib/queries'
 import { formatSetElapsed, inferMovementType, progressionIncrement, startingWorkoutWeight, type MovementType, type WorkoutExercise } from '@/lib/workout-flow'
 
@@ -90,6 +91,7 @@ export function SessionLogger({ routineDayId, dayName, exercises: planExercises,
       setLoading(true)
       setError(null)
       try {
+        syncBrowserTimeZone()
         const result = await startSession(routineDayId)
         if (!active) return
         if (result.error || !result.sessionId || !result.exercises) {

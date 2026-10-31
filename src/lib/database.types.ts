@@ -1,4 +1,3 @@
-// Generated from the linked Supabase project. Regenerate after schema changes.
 export type Json =
   | string
   | number
@@ -360,6 +359,7 @@ export type Database = {
           routine_day_id: string | null
           started_at: string
           total_volume: number
+          unit: string
           user_id: string
         }
         Insert: {
@@ -370,6 +370,7 @@ export type Database = {
           routine_day_id?: string | null
           started_at?: string
           total_volume?: number
+          unit?: string
           user_id: string
         }
         Update: {
@@ -380,6 +381,7 @@ export type Database = {
           routine_day_id?: string | null
           started_at?: string
           total_volume?: number
+          unit?: string
           user_id?: string
         }
         Relationships: [
@@ -404,25 +406,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_ai_request: {
+        Args: { p_feature: string; p_request_id: string }
+        Returns: Json
+      }
       complete_workout_set: {
         Args: {
-          // SQL accepts null for unused metrics, bodyweight and unclassified holds.
-          // The Supabase generator does not infer function-argument nullability.
-          p_movement_type: string | null
-          p_reps: number | null
-          p_seconds: number | null
+          p_movement_type?: string
+          p_reps?: number
+          p_seconds?: number
           p_set_index: number
-          p_weight: number | null
+          p_weight?: number
           p_workout_exercise_id: string
         }
         Returns: Json
       }
       consume_demo_coach_request: { Args: never; Returns: number }
       finish_workout: { Args: { p_session_id: string }; Returns: undefined }
+      get_completed_workout_dates: {
+        Args: { p_from: string }
+        Returns: {
+          performed_on: string
+        }[]
+      }
       initialize_demo_mode: { Args: never; Returns: undefined }
       prepare_workout_exercises: {
         Args: { p_session_id: string }
         Returns: Json
+      }
+      record_ai_response: {
+        Args: { p_finished?: boolean; p_lease_id: string; p_response: Json }
+        Returns: undefined
       }
       reset_active_plan_to_empty: { Args: never; Returns: string }
       reset_training_data: { Args: never; Returns: undefined }

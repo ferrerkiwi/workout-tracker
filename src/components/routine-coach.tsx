@@ -3,6 +3,7 @@
 import { Bot, Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { boundedCoachHistory } from '@/lib/coach-request'
 import type { RefObject } from 'react'
 
 type ChatMessage = {
@@ -17,8 +18,6 @@ const SUGGESTIONS = [
   'Add more chest work',
 ]
 
-const MAX_HISTORY = 8
-
 export function RoutineCoach() {
   const router = useRouter()
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -27,6 +26,8 @@ export function RoutineCoach() {
   const [error, setError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null)
+  const retryRequestId = useRef<string | null>(null)
+  const [canRetry, setCanRetry] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,6 +46,9 @@ export function RoutineCoach() {
     const appendUserMessage = options.appendUserMessage ?? true
 
     setError(null)
+    setCanRetry(true)
+    const requestId = options.appendUserMessage === false && retryRequestId.current ? retryRequestId.current : crypto.randomUUID()
+    retryRequestId.current = requestId
     setBusy(true)
     setDraft('')
     setLastUserMessage(content)
@@ -58,8 +62,9 @@ export function RoutineCoach() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          requestId,
           message: content,
-          history: messages.slice(-MAX_HISTORY),
+          history: boundedCoachHistory(messages),
         }),
       })
       const body = (await res.json().catch(() => ({}))) as {
@@ -68,7 +73,12 @@ export function RoutineCoach() {
         routineChanged?: boolean
       }
 
+      if (body.routineChanged) {
+        router.refresh()
+        setCanRetry(false)
+      }
       if (!res.ok || !body.message) {
+        if (!body.routineChanged && res.status !== 429) retryRequestId.current = null
         throw new Error(body.error ?? 'The coach could not respond.')
       }
 
@@ -77,7 +87,7 @@ export function RoutineCoach() {
         { role: 'assistant', content: body.message },
       ])
 
-      if (body.routineChanged) router.refresh()
+      retryRequestId.current = null
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The coach failed.')
     } finally {
@@ -100,8 +110,9 @@ export function RoutineCoach() {
       setDraft={setDraft}
       onSubmit={onSubmit}
       onSuggestion={(suggestion) => void sendMessage(suggestion)}
+      canRetry={canRetry}
       onRetry={() =>
-        lastUserMessage &&
+        canRetry && lastUserMessage &&
         void sendMessage(lastUserMessage, { appendUserMessage: false })
       }
     />
@@ -163,6 +174,7 @@ function CoachPanel({
   onSubmit,
   onSuggestion,
   onRetry,
+  canRetry,
 }: {
   busy: boolean
   draft: string
@@ -172,6 +184,7 @@ function CoachPanel({
   setDraft: (value: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onSuggestion: (suggestion: string) => void
+  canRetry: boolean
   onRetry: () => void
 }) {
   return (
@@ -226,7 +239,7 @@ function CoachPanel({
         {error && (
           <div className="rounded-md border border-danger/30 bg-danger/10 p-3">
             <p className="text-sm text-danger">{error}</p>
-            <button
+            {canRetry && <button
               type="button"
               onClick={onRetry}
               disabled={busy}
@@ -234,7 +247,7 @@ function CoachPanel({
             >
               <RotateCcw className="size-3" />
               Retry
-            </button>
+            </button>}
           </div>
         )}
       </div>

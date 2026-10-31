@@ -9,6 +9,9 @@ import {
   Timer,
   Trash2,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { SerialWriteQueue } from '@/lib/serial-write-queue'
+import { MAX_WEIGHT } from '@/lib/weight'
 import { useEffect, useRef, useState } from 'react'
 import { DAY_NAMES } from '@/lib/constants'
 import {
@@ -39,6 +42,10 @@ export function PlanEditor({
   unit: string
   readOnly?: boolean
 }) {
+  const router = useRouter()
+  const queue = useRef(new SerialWriteQueue())
+  const [saving, setSaving] = useState(false)
+  const [revision, setRevision] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState(routine)
   const writesInFlight = useRef(0)
@@ -51,33 +58,36 @@ export function PlanEditor({
   )
 
   // A coach edit or a later navigation can provide a new server snapshot. Do
-  // not let an in-flight action response overwrite the local optimistic view.
+  // not let an older snapshot replace changes while queued writes are saving.
   useEffect(() => {
     if (writesInFlight.current === 0) setPlan(routine)
   }, [routine])
 
-  const run: PlanMutation = (action, optimistic, onSuccess) => {
-    const rollback = plan
+  const run: PlanMutation = (action, apply, onSuccess) => {
     writesInFlight.current += 1
+    setSaving(true)
     setError(null)
-    setPlan(optimistic)
-
-    return action()
-      .then((result) => {
+    return queue.current.enqueue(async () => {
+      try {
+        const result = await action()
         if (result.error) {
-          setPlan(rollback)
           setError(result.error)
-          return
+        } else {
+          setPlan(apply)
+          onSuccess?.(result, setPlan)
         }
-        onSuccess?.(result, setPlan)
-      })
-      .catch(() => {
-        setPlan(rollback)
+      } catch {
         setError('Could not save that change. Please try again.')
-      })
-      .finally(() => {
+      } finally {
+        // Reset uncontrolled fields even after a rejected edit.
+        setRevision((value) => value + 1)
         writesInFlight.current -= 1
-      })
+        if (writesInFlight.current === 0) {
+          setSaving(false)
+          router.refresh()
+        }
+      }
+    })
   }
 
   return (
@@ -88,6 +98,8 @@ export function PlanEditor({
         </p>
       )}
 
+      {saving && <p role="status" className="text-sm text-muted">Saving changes…</p>}
+      <fieldset key={revision} disabled={saving} className="min-w-0 space-y-3">
       {plan.routine_days.map((day) => (
         <DayCard
           key={day.id}
@@ -99,6 +111,7 @@ export function PlanEditor({
           readOnly={readOnly}
         />
       ))}
+      </fieldset>
     </div>
   )
 }
@@ -532,8 +545,10 @@ function NumberField({
         type="number"
         inputMode="decimal"
         step={
-          label === 'Sets' || label === 'Reps' || label === 'Seconds' ? 1 : 0.5
+          label === 'Sets' || label === 'Reps' || label === 'Seconds' ? 1 : 'any'
         }
+        min={allowEmpty ? 0 : 1}
+        max={allowEmpty ? MAX_WEIGHT : label === 'Sets' ? 20 : label === 'Reps' ? 100 : 3600}
         defaultValue={defaultValue ?? ''}
         placeholder={allowEmpty ? '—' : undefined}
         className="input no-spin px-2.5 py-1.5 text-center"
@@ -545,6 +560,7 @@ function NumberField({
           }
           const parsed = Number(raw)
           if (!Number.isFinite(parsed) || parsed === defaultValue) return
+          if (!e.target.validity.valid) { e.target.reportValidity(); return }
           onCommit(parsed)
         }}
       />

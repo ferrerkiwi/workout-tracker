@@ -1,6 +1,5 @@
 import { History as HistoryIcon } from 'lucide-react'
 import { redirect } from 'next/navigation'
-import { getProfile } from '@/lib/queries'
 import { getAuthenticatedServerClient } from '@/lib/supabase/server'
 import { formatDateLabel, formatVolume } from '@/lib/week'
 
@@ -26,12 +25,10 @@ export default async function HistoryPage() {
   const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
-  const [profile, { data: sessions }] = await Promise.all([
-    getProfile(supabase, user.id),
-    supabase
+  const { data: sessions } = await supabase
       .from('workout_sessions')
       .select(
-        `id, name, performed_on, completed_at, total_volume,
+        `id, name, performed_on, completed_at, total_volume, unit,
          session_sets (
            exercise_name, order_index, set_index, reps, seconds, weight, completed
          )`,
@@ -39,10 +36,8 @@ export default async function HistoryPage() {
       .eq('user_id', user.id)
       .not('completed_at', 'is', null)
       .order('performed_on', { ascending: false })
-      .limit(100),
-  ])
+      .limit(100)
 
-  const unit = profile?.unit_preference ?? 'lbs'
   const rows = sessions ?? []
 
   return (
@@ -89,7 +84,7 @@ export default async function HistoryPage() {
                       </p>
                     </div>
                     <span className="shrink-0 text-sm font-medium text-accent tabular-nums">
-                      {formatVolume(Number(session.total_volume), unit)}
+                      {formatVolume(Number(session.total_volume), session.unit)}
                     </span>
                   </summary>
 

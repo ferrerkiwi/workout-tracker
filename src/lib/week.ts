@@ -1,10 +1,9 @@
 /**
  * Date helpers.
  *
- * Everything is computed in the runtime's local timezone and stored as a
- * `YYYY-MM-DD` string, matching the `date` columns in Postgres. Using
- * `toISOString()` here would shift the day for anyone west of UTC, so we
- * format from the local parts instead.
+ * Pure calendar arithmetic on local-midnight Date values. Server entrypoints
+ * obtain the user's calendar day from request-date.ts before using these
+ * helpers; they never infer the user's day from the server timezone.
  */
 
 /** `YYYY-MM-DD` for a Date, in local time. */
@@ -54,9 +53,9 @@ export function today(): Date {
 }
 
 /** "tomorrow", "Saturday", or a full date if it is further out. */
-export function relativeDayLabel(date: Date): string {
+export function relativeDayLabel(date: Date, now: Date = today()): string {
   const diff = Math.round(
-    (fromDateKey(toDateKey(date)).getTime() - today().getTime()) / 86_400_000,
+    (fromDateKey(toDateKey(date)).getTime() - now.getTime()) / 86_400_000,
   )
   if (diff === 0) return 'today'
   if (diff === 1) return 'tomorrow'

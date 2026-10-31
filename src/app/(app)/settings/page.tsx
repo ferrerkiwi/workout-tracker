@@ -60,7 +60,7 @@ export default async function SettingsPage() {
           </h2>
           <p className="mb-4 text-sm text-muted">
             These drive routine generation. Changing them affects your next
-            generated week, not the plan you already have.
+            generated routine. Changing units also converts your current plan weights.
           </p>
           <PreferencesForm
             mode="settings"

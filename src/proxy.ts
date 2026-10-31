@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { withResponseCookies } from '@/lib/auth-response'
 import type { Database } from '@/lib/database.types'
 import {
   REMEMBER_COOKIE,
@@ -61,7 +62,7 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = path
     url.search = ''
-    return NextResponse.redirect(url)
+    return withResponseCookies(response, NextResponse.redirect(url))
   }
 
   if (isApiRoute) return response

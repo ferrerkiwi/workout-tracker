@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { NextResponse } from 'next/server'
-import { generatedRoutineSchema, normaliseDays } from '@/lib/routine-schema'
+import { z } from 'zod'
+import { acquireAIRequest, recordAIResponse } from '@/lib/ai-requests'
+import { generatedRoutineSchema, routineInputSchema, normaliseDays } from '@/lib/routine-schema'
 import { isAnonymousUser } from '@/lib/demo'
 import { getPreferences, getProfile } from '@/lib/queries'
 import {
@@ -12,7 +14,9 @@ import {
 } from '@/lib/routine-prompt'
 import { createClient } from '@/lib/supabase/server'
 
-export async function POST() {
+export const maxDuration = 90
+
+export async function POST(request: Request) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -66,7 +70,14 @@ export async function POST() {
     unit,
   })
 
-  const anthropic = new Anthropic({ apiKey })
+  const parsedRequest = z.object({ requestId: z.string().uuid() }).safeParse(await request.json().catch(() => null))
+  if (!parsedRequest.success) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
+  const lease = await acquireAIRequest(supabase, 'generation', parsedRequest.data.requestId)
+  if ('error' in lease) return NextResponse.json({ error: lease.error }, { status: lease.status })
+  if (lease.cached) return NextResponse.json(lease.cached, { status: lease.cached.error ? 502 : 200 })
+  const leaseId = lease.leaseId!
+  const anthropic = new Anthropic({ apiKey, maxRetries: 0, timeout: 60_000 })
+  let recorded = false
 
   try {
     const message = await anthropic.messages.parse({
@@ -77,7 +88,8 @@ export async function POST() {
       output_config: { format: zodOutputFormat(generatedRoutineSchema) },
     })
 
-    const parsed = message.parsed_output
+    const validated = routineInputSchema.safeParse(message.parsed_output)
+    const parsed = validated.success ? validated.data : null
     if (!parsed) {
       return NextResponse.json(
         { error: 'The model returned an unreadable routine. Try again.' },
@@ -85,7 +97,7 @@ export async function POST() {
       )
     }
 
-    return NextResponse.json({
+    const response = {
       routine: { ...parsed, days: normaliseDays(parsed.days) },
       model: MODEL,
       promptVersion: PROMPT_VERSION,
@@ -93,7 +105,10 @@ export async function POST() {
         input_tokens: message.usage.input_tokens,
         output_tokens: message.usage.output_tokens,
       },
-    })
+    }
+    await recordAIResponse(supabase, leaseId, response)
+    recorded = true
+    return NextResponse.json(response)
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       // Billing and auth problems are actionable by the operator, so say what
@@ -125,6 +140,9 @@ export async function POST() {
         { status: 502 },
       )
     }
-    throw error
+    console.error('Routine generation failed', error instanceof Error ? error.name : 'Unknown error')
+    return NextResponse.json({ error: 'Could not generate a routine. Please try again.' }, { status: 502 })
+  } finally {
+    if (!recorded) await recordAIResponse(supabase, leaseId, { error: 'Generation did not complete. Send a new request to try again.' }).catch(() => undefined)
   }
 }

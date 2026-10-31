@@ -322,7 +322,7 @@ export function PreferencesForm({
         />
       </Section>
 
-      <Section title="Units">
+      <Section title="Units" hint="Changing units converts your plan weights. Logged workouts keep their original units.">
         <div className="flex gap-2">
           {['lbs', 'kg'].map((unit) => (
             <label key={unit} className="cursor-pointer">

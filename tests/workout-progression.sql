@@ -141,20 +141,24 @@ begin
     if sqlerrm <> 'That workout is not open.' then raise; end if;
   end;
 
-  -- Kilogram workouts freeze units and convert pound increases correctly.
+  -- Unit changes convert the plan, preserve the workout's recorded unit, and
+  -- prevent a session in the old unit from changing the newly converted plan.
   update public.profiles set unit_preference = 'kg' where id = v_user;
+  select target_weight into v_number from public.routine_exercises where routine_day_id=v_day and order_index=0;
+  if abs(v_number - 49.90) > 0.01 then raise exception 'Plan did not convert pounds to kg'; end if;
   insert into public.workout_sessions(user_id, routine_day_id, performed_on, name)
     values (v_user, v_day, current_date, 'Kilogram regression') returning id into v_session;
   perform public.prepare_workout_exercises(v_session);
-  update public.profiles set unit_preference = 'lbs' where id = v_user;
-  select id into v_exercise from public.workout_exercises where session_id = v_session and order_index = 0;
-  perform public.complete_workout_set(v_exercise, 0, 8, null, 110, 'compound');
-  v_result := public.complete_workout_set(v_exercise, 1, 8, null, 110, 'compound');
-  if (v_result->>'nextWeight')::numeric <> 114.54 then raise exception 'Kilogram compound increase is incorrect'; end if;
-  select id into v_exercise from public.workout_exercises where session_id = v_session and order_index = 1;
-  perform public.complete_workout_set(v_exercise, 0, 8, null, 105, 'isolation');
-  v_result := public.complete_workout_set(v_exercise, 1, 8, null, 105, 'isolation');
-  if (v_result->>'nextWeight')::numeric <> 107.27 then raise exception 'Kilogram isolation increase is incorrect'; end if;
+  select id into v_exercise from public.workout_exercises where session_id=v_session and order_index=0;
+  perform public.complete_workout_set(v_exercise, 0, 8, null, 49.90, 'compound');
+  v_result := public.complete_workout_set(v_exercise, 1, 8, null, 49.90, 'compound');
+  if (v_result->>'nextWeight')::numeric <> 54.44 then raise exception 'Kilogram compound increase is incorrect'; end if;
+  update public.profiles set unit_preference='lbs' where id=v_user;
+  select id into v_exercise from public.workout_exercises where session_id=v_session and order_index=1;
+  perform public.complete_workout_set(v_exercise, 0, 8, null, 47.63, 'isolation');
+  v_result := public.complete_workout_set(v_exercise, 1, 8, null, 47.63, 'isolation');
+  if v_result->>'nextWeight' is not null then raise exception 'Old-unit workout changed new-unit plan'; end if;
+  if (select unit from public.workout_sessions where id=v_session) <> 'kg' then raise exception 'Workout unit changed'; end if;
   execute 'reset role';
 end;
 $$;

@@ -1,4 +1,5 @@
-import { addDays, mondayIndex, toDateKey, today } from './week'
+import { addDays, mondayIndex, toDateKey, today } from './week.ts'
+import { dateKeyInTimeZone } from './time-zone.ts'
 
 export type PlanDay = {
   isRest: boolean
@@ -16,13 +17,14 @@ export type PlanDay = {
 export type PlanLookup = Map<number, PlanDay>
 
 /** Hard stop so a data gap can never spin this loop forever. */
-const MAX_LOOKBACK_DAYS = 730
+export const MAX_LOOKBACK_DAYS = 730
 
 export type StreakInput = {
   /** `YYYY-MM-DD` for every session with a `completed_at`. */
   completedDates: Set<string>
   /** Monday-based day index -> is_rest_day. Absent = no active routine that day. */
   plan: PlanLookup
+  date?: Date
 }
 
 /**
@@ -40,9 +42,8 @@ export type StreakInput = {
  *  - A day with no routine covering it stops the walk; we can't tell whether
  *    it was skipped, so we don't guess.
  */
-export function computeStreak({ completedDates, plan }: StreakInput): number {
+export function computeStreak({ completedDates, plan, date: start = today() }: StreakInput): number {
   let streak = 0
-  const start = today()
 
   for (let i = 0; i < MAX_LOOKBACK_DAYS; i++) {
     const date = addDays(start, -i)
@@ -74,12 +75,13 @@ export function buildRecurringPlanLookup(
     created_at: string
     routine_days: { day_of_week: number; is_rest_day: boolean }[]
   } | null,
+  timeZone = 'UTC',
 ): PlanLookup {
   const plan: PlanLookup = new Map()
   if (!routine) return plan
 
   // created_at is a timestamp; the streak compares whole days.
-  const planCreatedOn = routine.created_at.slice(0, 10)
+  const planCreatedOn = dateKeyInTimeZone(new Date(routine.created_at), timeZone)
   for (const day of routine.routine_days ?? []) {
     plan.set(day.day_of_week, {
       isRest: day.is_rest_day,

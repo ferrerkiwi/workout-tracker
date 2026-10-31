@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { isScheduledLaterThisWeek, toDateKey, today } from '@/lib/week'
+import { isScheduledLaterThisWeek, toDateKey } from '@/lib/week'
+import { getUserToday } from '@/lib/request-date'
 import { validateLoggedSet } from '@/lib/session-validation'
 import type { MovementType, WorkoutExercise } from '@/lib/workout-flow'
 
@@ -40,7 +41,8 @@ export async function startSession(
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const performedOn = toDateKey(today())
+  const date = await getUserToday()
+  const performedOn = toDateKey(date)
 
   // A workout scheduled for a later weekday cannot be started yet. Checked
   // here rather than only in the UI, so the guard holds however the action is
@@ -61,7 +63,7 @@ export async function startSession(
     return { error: 'That day is a rest day — there is nothing to log.' }
   }
 
-  if (isScheduledLaterThisWeek(scheduled.day_of_week)) {
+  if (isScheduledLaterThisWeek(scheduled.day_of_week, date)) {
     return {
       error: 'That workout is scheduled for a later day this week. ' +
         'You can start it on the day.',
@@ -150,10 +152,10 @@ export async function completeSet(
   const { data, error } = await supabase.rpc('complete_workout_set', {
     p_workout_exercise_id: workoutExerciseId,
     p_set_index: set.set_index,
-    p_reps: set.reps,
-    p_seconds: set.seconds,
-    p_weight: set.weight,
-    p_movement_type: movementType,
+    p_reps: set.reps ?? undefined,
+    p_seconds: set.seconds ?? undefined,
+    p_weight: set.weight ?? undefined,
+    p_movement_type: movementType ?? undefined,
   })
   if (error) return { error: error.message }
   revalidatePath('/plan')

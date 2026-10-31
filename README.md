@@ -15,8 +15,9 @@ Completing every rep target on a loaded exercise increases its plan weight once
 per workout: 10 lb for compound exercises or 5 lb for isolation exercises (the
 equivalent in kilograms for kg plans). Common movement types are recognized and
 can be corrected before starting or saving a set. Timed and bodyweight exercises
-do not automatically increase weight. Workout targets are snapshotted when the
-session opens, and progression never overwrites a plan edited during a workout.
+do not automatically increase weight. Workout targets refresh from the plan when an exercise has no saved sets and
+the workout is reopened. Once an exercise has a saved set, its targets stay
+fixed. Progression never overwrites a plan edited during a workout.
 
 **Live app:** [workout-tracker-six-lilac.vercel.app](https://workout-tracker-six-lilac.vercel.app/)
 
@@ -65,6 +66,32 @@ baseline migration. Do not reset the production project.
 Supabase Auth's leaked-password protection is available only on Pro and above.
 The advisor will continue to report it while this project remains on the Free
 plan; no billing change is required for the application to operate.
+
+## Dates, units, and AI limits
+
+Calendar dates use the browser's IANA timezone, shared with the server in a
+non-sensitive cookie. Switching between pounds and kilograms converts active
+plan weights atomically. Each workout keeps its original unit; weekly volume
+converts those saved units into the current preference before adding totals.
+Legacy sessions without exercise snapshots were assigned the profile unit at
+migration time because the previous schema did not record their original unit.
+
+Registered accounts can generate five routines and send 30 coach requests per
+UTC day. Demo accounts have three coach requests per UTC day. All accounts
+share a limit of six requests per minute and one AI request in flight per user.
+Limits and request responses are stored in a private database schema. Replaying
+an existing request returns its recorded response without repeating saved edits.
+Interrupted coach requests report any saved changes and refresh the plan.
+
+Run both `tests/workout-progression.sql` and `tests/audit-regressions.sql` as a
+database administrator to check progression, units, plan corrections, ownership,
+usage protection, request replay, concurrency, and daily quotas. Both suites
+create synthetic fixtures and roll everything back.
+
+`npm audit --omit=dev` checks deployed dependencies. The remaining full-audit
+advisories concern development-only ESLint dependencies on older minimatch
+APIs; forcing a major override would break those callers. They do not ship in
+the production application.
 
 ## Demo mode
 

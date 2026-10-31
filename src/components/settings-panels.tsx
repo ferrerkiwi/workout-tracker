@@ -53,6 +53,9 @@ export function DisplayNamePanel({ initial }: { initial: string }) {
 
 export function DangerZonePanel() {
   const [confirming, setConfirming] = useState(false)
+  const [resetState, resetAction, resetting] = useActionState<SettingsState, FormData>(
+    async () => resetTrainingData(), {},
+  )
 
   return (
     <div className="card border-danger/25">
@@ -72,16 +75,12 @@ export function DangerZonePanel() {
         </button>
       ) : (
         <form
-          // Wrapped so the form action resolves to void; the server action
-          // redirects on success and only returns a value on failure.
-          action={async () => {
-            await resetTrainingData()
-          }}
+          action={resetAction}
           className="mt-4 flex flex-wrap gap-2"
         >
-          <button type="submit" className="btn-danger">
+          <button type="submit" className="btn-danger" disabled={resetting}>
             <RotateCcw className="size-4" />
-            Yes, delete everything
+            {resetting ? 'Deleting…' : 'Yes, delete everything'}
           </button>
           <button
             type="button"
@@ -92,6 +91,7 @@ export function DangerZonePanel() {
           </button>
         </form>
       )}
+      {resetState.error && <p role="alert" className="mt-3 text-sm text-danger">{resetState.error}</p>}
     </div>
   )
 }

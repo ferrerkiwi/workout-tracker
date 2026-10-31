@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
-  generatedRoutineSchema,
+  routineInputSchema,
   normaliseDays,
   type GeneratedRoutine,
 } from '@/lib/routine-schema'
@@ -24,7 +24,7 @@ export async function saveRoutine(
   model: string,
   promptVersion: string,
 ): Promise<SaveRoutineResult> {
-  const parsed = generatedRoutineSchema.safeParse(input)
+  const parsed = routineInputSchema.safeParse(input)
   if (!parsed.success) return { error: 'That routine is malformed.' }
 
   const supabase = await createClient()

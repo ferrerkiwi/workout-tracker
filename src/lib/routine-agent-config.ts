@@ -1,9 +1,6 @@
 export const ROUTINE_AGENT_MODEL =
   process.env.ANTHROPIC_ROUTINE_AGENT_MODEL ?? 'claude-haiku-4-5'
 export const ROUTINE_AGENT_PROMPT_VERSION = 'routine-coach-v1'
-export const ROUTINE_AGENT_MAX_INPUT_CHARS = 1200
-export const ROUTINE_AGENT_MAX_HISTORY_MESSAGES = 8
-export const ROUTINE_AGENT_MAX_HISTORY_CHARS = 1200
 export const ROUTINE_AGENT_MAX_TOOL_STEPS = 6
 export const ROUTINE_AGENT_MAX_TOKENS = 1800
 

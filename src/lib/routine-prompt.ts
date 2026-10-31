@@ -46,8 +46,8 @@ Rules:
   straight into the logger for the user to lift. Follow exactly one branch:
   - BEGINNER: set suggested_weight to null for every single exercise, with no
     exceptions. You have no idea what this person can lift, and a confident
-    number is one they will try to match. They fill in what they actually
-    used on the first session and the app remembers it.
+    number is one they will try to match. They choose their starting load in the workout plan before opening
+    the workout. Never describe a null load as a measured lifting weight.
   - INTERMEDIATE OR ADVANCED: suggest a weight where you can make a sensible
     estimate. Use null for bodyweight movements and anywhere a number would
     be a guess.

@@ -65,6 +65,24 @@ export const generatedRoutineSchema = z.object({
     .describe('One or two sentences explaining the structure of the week.'),
 })
 
+/** Validate at both HTTP and persistence boundaries, independently of model output. */
+export const routineInputSchema = generatedRoutineSchema.extend({
+  days: z.array(generatedDaySchema.extend({
+    day_of_week: z.number().int().min(0).max(6),
+    name: z.string().trim().min(1).max(80),
+    exercises: z.array(generatedExerciseSchema.extend({
+      name: z.string().trim().min(1).max(120),
+      sets: z.number().int().min(1).max(20),
+      reps: z.number().int().min(1).max(100),
+      duration_seconds: z.number().int().min(1).max(3600).nullable(),
+      suggested_weight: z.number().min(0).max(5000).nullable(),
+      rest_seconds: z.number().int().min(0).max(900),
+      notes: z.string().max(500),
+    })).max(50),
+  })).max(7),
+  summary: z.string().max(2000),
+})
+
 export type GeneratedRoutine = z.infer<typeof generatedRoutineSchema>
 export type GeneratedDay = z.infer<typeof generatedDaySchema>
 

@@ -2,6 +2,7 @@ import { ArrowLeft, CalendarClock } from 'lucide-react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { SessionLogger } from '@/components/session-logger'
+import { getUserToday } from '@/lib/request-date'
 import { DAY_NAMES } from '@/lib/constants'
 import type { RoutineExercise } from '@/lib/queries'
 import { getProfile } from '@/lib/queries'
@@ -33,7 +34,7 @@ export default async function SessionPage({
 
   if (!day) notFound()
 
-  const notYet = isScheduledLaterThisWeek(day.day_of_week)
+  const notYet = isScheduledLaterThisWeek(day.day_of_week, await getUserToday())
 
   const profile = await getProfile(supabase, user.id)
   const unit = profile?.unit_preference ?? 'lbs'

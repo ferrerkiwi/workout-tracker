@@ -6,6 +6,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getUserToday, getRequestTimeZone } from '@/lib/request-date'
+import { convertWeight } from '@/lib/weight'
 import { DAY_NAMES } from '@/lib/constants'
 import {
   getActiveRoutine,
@@ -23,31 +25,31 @@ import {
   relativeDayLabel,
   startOfWeek,
   toDateKey,
-  today,
 } from '@/lib/week'
 
 export default async function DashboardPage() {
   const { supabase, user } = await getAuthenticatedServerClient()
   if (!user) redirect('/login')
 
-  const now = today()
+  const now = await getUserToday()
   const weekStart = startOfWeek(now)
 
   const [profile, routine, streakSource, weekSessions] = await Promise.all([
     getProfile(supabase, user.id),
     getActiveRoutine(supabase, user.id),
-    getStreakSource(supabase, user.id),
-    getThisWeekSessions(supabase, user.id),
+    getStreakSource(supabase, now),
+    getThisWeekSessions(supabase, user.id, now),
   ])
 
   const unit = profile?.unit_preference ?? 'lbs'
 
   const streak = computeStreak({
+    date: now,
     completedDates: streakSource.completedDates,
-    plan: buildRecurringPlanLookup(routine),
+    plan: buildRecurringPlanLookup(routine, await getRequestTimeZone()),
   })
 
-  const weekVolume = weekSessions.reduce((sum, s) => sum + Number(s.total_volume), 0)
+  const weekVolume = weekSessions.reduce((sum, s) => sum + convertWeight(Number(s.total_volume), s.unit, unit), 0)
 
   const todayIndex = mondayIndex(now)
   const todayEntry =
@@ -144,7 +146,7 @@ export default async function DashboardPage() {
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-edge pt-4">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-muted">
-                    Up next · {relativeDayLabel(upcomingDate)}
+                    Up next · {relativeDayLabel(upcomingDate, now)}
                   </p>
                   <p className="mt-0.5 truncate font-medium">{upcoming.name}</p>
                 </div>
@@ -197,7 +199,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 <span className="text-sm font-medium text-accent">
-                  {formatVolume(Number(session.total_volume), unit)}
+                  {formatVolume(Number(session.total_volume), session.unit)}
                 </span>
               </li>
             ))}

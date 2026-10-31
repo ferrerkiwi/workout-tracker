@@ -1,3 +1,4 @@
+import { MAX_LOOKBACK_DAYS } from './streak'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
 import { addDays, startOfWeek, toDateKey, today } from '@/lib/week'
@@ -107,15 +108,10 @@ function sortRoutine(routine: Routine): Routine {
 }
 
 /** Completed dates needed to compute the recurring-plan streak. */
-export async function getStreakSource(supabase: Client, userId: string) {
-  const from = toDateKey(addDays(today(), -200))
+export async function getStreakSource(supabase: Client, date = today()) {
+  const from = toDateKey(addDays(date, -MAX_LOOKBACK_DAYS))
 
-  const { data: sessions } = await supabase
-    .from('workout_sessions')
-    .select('performed_on')
-    .eq('user_id', userId)
-    .not('completed_at', 'is', null)
-    .gte('performed_on', from)
+  const { data: sessions } = await supabase.rpc('get_completed_workout_dates', { p_from: from })
 
   return {
     completedDates: new Set((sessions ?? []).map((s) => s.performed_on)),
@@ -123,11 +119,11 @@ export async function getStreakSource(supabase: Client, userId: string) {
 }
 
 /** Completed sessions in the current Monday-start week. */
-export async function getThisWeekSessions(supabase: Client, userId: string) {
-  const weekStart = toDateKey(startOfWeek(today()))
+export async function getThisWeekSessions(supabase: Client, userId: string, date = today()) {
+  const weekStart = toDateKey(startOfWeek(date))
   const { data } = await supabase
     .from('workout_sessions')
-    .select('id, name, performed_on, total_volume, routine_day_id')
+    .select('id, name, performed_on, total_volume, routine_day_id, unit')
     .eq('user_id', userId)
     .not('completed_at', 'is', null)
     .gte('performed_on', weekStart)

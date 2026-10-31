@@ -1,3 +1,4 @@
+import { isValidWeight } from './weight'
 import { revalidatePath } from 'next/cache'
 import type { TablesUpdate } from '@/lib/database.types'
 import type { Client, RoutineExercise } from '@/lib/queries'
@@ -31,6 +32,7 @@ export async function addRoutineExercise(
   routineDayId: string,
   input: AddExerciseInput = {},
 ): Promise<ActionResult<RoutineExercise>> {
+  if (input.target_weight !== undefined && !isValidWeight(input.target_weight)) return { error: 'Weight must be between 0 and 5000.' }
   const day = await getRoutineDay(supabase, routineDayId)
   if (!day) return { error: 'Routine day not found.' }
 
@@ -231,6 +233,7 @@ export async function updateRoutineDay(
 function cleanExercisePatch(
   patch: ExercisePatch,
 ): TablesUpdate<'routine_exercises'> | ActionResult {
+  if (patch.target_weight !== undefined && !isValidWeight(patch.target_weight)) return { error: 'Weight must be between 0 and 5000.' }
   const clean: TablesUpdate<'routine_exercises'> = {}
   if (patch.exercise_name !== undefined) {
     const name = patch.exercise_name.trim()
